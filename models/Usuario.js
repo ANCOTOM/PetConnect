@@ -11,9 +11,10 @@ const mascotaSchema = new mongoose.Schema({
 const usuarioSchema = new mongoose.Schema({
   nombre: { type: String, required: true },
   correo: { type: String, required: true, unique: true },
-  contraseña: { type: String, required: true },
-  fotoUsuario: { type: String },
-  fechaRegistro: { type: Date, default: Date.now },
+  contrasena_hash: { type: String, required: true },  // cambiar contraseña a hash
+  foto_perfil: { type: String },
+  biografia: { type: String },
+  fecha_creacion: { type: Date, default: Date.now },  // para que coincida con GET
   mascotas: [mascotaSchema]
 });
 
