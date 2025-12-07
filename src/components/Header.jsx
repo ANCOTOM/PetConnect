@@ -1,0 +1,174 @@
+import { useState } from 'react';
+import { Button } from './ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Bell, Home, User, LogOut, Search, PawPrint, Users, Sparkles, Settings, Shield } from 'lucide-react';
+import { Badge } from './ui/badge';
+
+export function Header({ 
+  userName,
+  userProfilePicture, 
+  currentView, 
+  onViewChange, 
+  onSearch, 
+  onLogout,
+  notificationsCount = 0,
+  isAdmin = false
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState('users');
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      onSearch(searchQuery.trim(), searchType);
+    }
+  };
+
+  return (
+    <header className="sticky top-0 z-50 bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg">
+      <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="flex items-center justify-between gap-4">
+
+          {/* Logo */}
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => onViewChange('feed')}>
+            <div className="bg-white p-2 rounded-full">
+              <PawPrint className="h-6 w-6 text-orange-500" />
+            </div>
+            <span className="text-white hidden sm:block">PetConnect</span>
+          </div>
+
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="flex-1 max-w-md flex gap-2">
+            <Select value={searchType} onValueChange={(value) => setSearchType(value)}>
+              <SelectTrigger className="w-32 bg-white/90 border-none">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="users">Usuarios</SelectItem>
+                <SelectItem value="posts">Posts</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder={searchType === 'users' ? 'Buscar usuarios...' : 'Buscar publicaciones...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-white/90 border-none focus:bg-white"
+              />
+            </div>
+          </form>
+
+          {/* Navigation */}
+          <nav className="flex items-center gap-2">
+
+            <Button
+              variant={currentView === 'feed' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => onViewChange('feed')}
+              className={currentView === 'feed' ? '' : 'text-white hover:bg-white/20'}
+            >
+              <Home className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant={currentView === 'following' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => onViewChange('following')}
+              className={currentView === 'following' ? '' : 'text-white hover:bg-white/20'}
+              title="Siguiendo"
+            >
+              <Users className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant={currentView === 'discover' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => onViewChange('discover')}
+              className={currentView === 'discover' ? '' : 'text-white hover:bg-white/20'}
+              title="Descubrir"
+            >
+              <Sparkles className="h-5 w-5" />
+            </Button>
+
+            <div className="relative">
+              <Button
+                variant={currentView === 'notifications' ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => onViewChange('notifications')}
+                className={currentView === 'notifications' ? '' : 'text-white hover:bg-white/20'}
+              >
+                <Bell className="h-5 w-5" />
+              </Button>
+
+              {notificationsCount > 0 && (
+                <Badge 
+                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs"
+                >
+                  {notificationsCount > 9 ? '9+' : notificationsCount}
+                </Badge>
+              )}
+            </div>
+
+            <Button
+              variant={currentView === 'profile' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => onViewChange('profile')}
+              className={currentView === 'profile' ? '' : 'text-white hover:bg-white/20'}
+            >
+              <User className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant={currentView === 'settings' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => onViewChange('settings')}
+              className={currentView === 'settings' ? '' : 'text-white hover:bg-white/20'}
+              title="Configuración"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+
+            {isAdmin && (
+              <Button
+                variant={currentView === 'admin' ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => onViewChange('admin')}
+                className={currentView === 'admin' ? '' : 'text-white hover:bg-white/20'}
+                title="Panel de Administración"
+              >
+                <Shield className="h-5 w-5" />
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onLogout}
+              className="text-white hover:bg-white/20"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+
+            <Avatar 
+              className="h-9 w-9 border-2 border-white cursor-pointer" 
+              onClick={() => onViewChange('profile')}
+            >
+              {userProfilePicture && (
+                <AvatarImage src={userProfilePicture} alt={userName} />
+              )}
+              <AvatarFallback className="bg-white text-orange-600">
+                {userName.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+
+          </nav>
+        </div>
+      </div>
+    </header>
+  );
+}

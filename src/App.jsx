@@ -1,0 +1,606 @@
+import { useState, useEffect } from 'react';
+import { AuthForm } from './components/AuthForm';
+import { Header } from './components/Header';
+import { CreatePostForm } from './components/CreatePostForm';
+import { PostCard } from './components/PostCard';
+import { ProfileView } from './components/ProfileView';
+import { NotificationsView } from './components/NotificationsView';
+import { SettingsView } from './components/SettingsView';
+import { AdminPanel } from './components/AdminPanel';
+import { CommentsDialog } from './components/CommentsDialog';
+import { Card, CardContent } from './components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from './components/ui/avatar';
+import { Button } from './components/ui/button';
+import { Toaster } from './components/ui/sonner';
+
+// Firebase imports
+import { auth, db } from './firebase/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  limit,
+  getDocs,
+  doc,
+  getDoc,
+  where
+} from 'firebase/firestore';
+
+/**
+ * PetConnect - Red Social para Amantes de Mascotas
+ * 
+ * Aplicación completa con React + Firebase
+ * Incluye: OAuth, Recuperación de contraseña, Posts,
+ * Notificaciones, Panel de administración
+ */
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [currentView, setCurrentView] = useState('feed');
+  const [posts, setPosts] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [followingUsers, setFollowingUsers] = useState([]);
+  const [recommendedUsers, setRecommendedUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedPostId, setSelectedPostId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [searchType, setSearchType] = useState('users');
+  const [selectedHashtag, setSelectedHashtag] = useState(null);
+  const [trendingHashtags, setTrendingHashtags] = useState([]);
+
+  // Listener de autenticación de Firebase
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        await loadProfile(currentUser.uid);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Cargar feed cuando el usuario está autenticado
+  useEffect(() => {
+    if (user && currentView === 'feed') {
+      loadFeed();
+    }
+  }, [user, currentView]);
+
+  const loadProfile = async (userId) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        setProfile({ id: userDoc.id, ...userDoc.data() });
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
+
+  const loadFeed = async () => {
+    if (!user) return;
+
+    try {
+      // Query posts públicos ordenados por fecha
+      const postsQuery = query(
+        collection(db, 'posts'),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      );
+
+      const snapshot = await getDocs(postsQuery);
+      const postsData = [];
+
+      for (const docSnap of snapshot.docs) {
+        const postData = { id: docSnap.id, ...docSnap.data() };
+
+        // Cargar info del autor
+        if (postData.userId) {
+          const authorDoc = await getDoc(doc(db, 'users', postData.userId));
+          postData.author = authorDoc.exists() ? authorDoc.data() : null;
+        }
+
+        // Verificar si el usuario actual le dio like
+        const likesQuery = query(
+          collection(db, 'posts', docSnap.id, 'likes'),
+          where('userId', '==', user.uid)
+        );
+        const likesSnapshot = await getDocs(likesQuery);
+        postData.isLiked = !likesSnapshot.empty;
+
+        // Verificar si el usuario actual compartió
+        const sharesQuery = query(
+          collection(db, 'posts', docSnap.id, 'shares'),
+          where('userId', '==', user.uid)
+        );
+        const sharesSnapshot = await getDocs(sharesQuery);
+        postData.isShared = !sharesSnapshot.empty;
+
+        postsData.push(postData);
+      }
+
+      setPosts(postsData);
+    } catch (error) {
+      console.error('Error loading feed:', error);
+    }
+  };
+
+  const handleSearch = async (searchQuery, type) => {
+    if (!user) return;
+
+    try {
+      if (type === 'users') {
+        // Buscar usuarios por nombre
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const results = usersSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(u => 
+            u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+
+        setSearchResults(results);
+        setSearchType('users');
+        setCurrentView('search');
+      } else {
+        // Buscar posts por contenido
+        const postsSnapshot = await getDocs(collection(db, 'posts'));
+        const results = [];
+
+        for (const docSnap of postsSnapshot.docs) {
+          const postData = { id: docSnap.id, ...docSnap.data() };
+          
+          if (postData.content?.toLowerCase().includes(searchQuery.toLowerCase())) {
+            // Cargar autor
+            if (postData.userId) {
+              const authorDoc = await getDoc(doc(db, 'users', postData.userId));
+              postData.author = authorDoc.exists() ? authorDoc.data() : null;
+            }
+            results.push(postData);
+          }
+        }
+
+        setPosts(results);
+        setSearchType('posts');
+        setCurrentView('search');
+      }
+    } catch (error) {
+      console.error('Error searching:', error);
+    }
+  };
+
+  const loadFollowing = async () => {
+    if (!user) return;
+
+    try {
+      const followsQuery = query(
+        collection(db, 'follows'),
+        where('followerId', '==', user.uid)
+      );
+
+      const snapshot = await getDocs(followsQuery);
+      const followingData = [];
+
+      for (const docSnap of snapshot.docs) {
+        const followData = docSnap.data();
+        const userDoc = await getDoc(doc(db, 'users', followData.followingId));
+        
+        if (userDoc.exists()) {
+          followingData.push({ id: userDoc.id, ...userDoc.data() });
+        }
+      }
+
+      setFollowingUsers(followingData);
+    } catch (error) {
+      console.error('Error loading following:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setPosts([]);
+      setCurrentView('feed');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  const loadRecommendations = async () => {
+    if (!user) return;
+
+    try {
+      // Cargar usuarios que el usuario actual NO sigue
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const followsQuery = query(
+        collection(db, 'follows'),
+        where('followerId', '==', user.uid)
+      );
+      const followsSnapshot = await getDocs(followsQuery);
+      
+      const followingIds = followsSnapshot.docs.map(doc => doc.data().followingId);
+      
+      const recommendations = usersSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(u => u.id !== user.uid && !followingIds.includes(u.id))
+        .slice(0, 10); // Limitar a 10 recomendaciones
+
+      setRecommendedUsers(recommendations);
+    } catch (error) {
+      console.error('Error loading recommendations:', error);
+    }
+  };
+
+  const loadTrendingHashtags = async () => {
+    if (!user) return;
+
+    try {
+      // Cargar hashtags de Firestore
+      const hashtagsQuery = query(
+        collection(db, 'hashtags'),
+        orderBy('count', 'desc'),
+        limit(10)
+      );
+
+      const snapshot = await getDocs(hashtagsQuery);
+      const hashtags = snapshot.docs.map(doc => ({
+        id: doc.id,
+        hashtag: doc.data().hashtag,
+        count: doc.data().count
+      }));
+
+      setTrendingHashtags(hashtags);
+    } catch (error) {
+      console.error('Error loading trending hashtags:', error);
+    }
+  };
+
+  const handleHashtagClick = async (hashtag) => {
+    if (!user) return;
+
+    try {
+      const cleanHashtag = hashtag.startsWith('#') ? hashtag.substring(1) : hashtag;
+
+      // Buscar posts que contengan el hashtag
+      const postsSnapshot = await getDocs(collection(db, 'posts'));
+      const results = [];
+
+      for (const docSnap of postsSnapshot.docs) {
+        const postData = { id: docSnap.id, ...docSnap.data() };
+        
+        if (postData.content?.toLowerCase().includes(`#${cleanHashtag.toLowerCase()}`)) {
+          // Cargar autor
+          if (postData.userId) {
+            const authorDoc = await getDoc(doc(db, 'users', postData.userId));
+            postData.author = authorDoc.exists() ? authorDoc.data() : null;
+          }
+          results.push(postData);
+        }
+      }
+
+      setPosts(results);
+      setSelectedHashtag(`#${cleanHashtag}`);
+      setCurrentView('hashtag');
+    } catch (error) {
+      console.error('Error loading hashtag posts:', error);
+    }
+  };
+
+  const handleViewChange = (view) => {
+    setCurrentView(view);
+    
+    if (view === 'feed') {
+      loadFeed();
+    } else if (view === 'following') {
+      loadFollowing();
+    } else if (view === 'profile') {
+      setSelectedUserId(user?.uid || null);
+    } else if (view === 'discover') {
+      loadRecommendations();
+    } else if (view === 'trending') {
+      loadTrendingHashtags();
+    }
+  };
+
+  const handleUserClick = (userId) => {
+    setSelectedUserId(userId);
+    setCurrentView('profile');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-100 via-yellow-50 to-amber-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-orange-700">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <AuthForm onSuccess={(newUser) => {
+          setUser(newUser);
+          loadProfile(newUser.uid);
+        }} />
+        <Toaster />
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-amber-50">
+      <Header
+        userName={profile?.name || 'Usuario'}
+        userProfilePicture={profile?.profilePicture}
+        currentView={currentView}
+        onViewChange={handleViewChange}
+        onSearch={handleSearch}
+        onLogout={handleLogout}
+        isAdmin={profile?.isAdmin || false}
+      />
+
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {currentView === 'feed' && (
+          <div className="max-w-2xl mx-auto space-y-6">
+            <CreatePostForm
+              userName={profile?.name || 'Usuario'}
+              userProfilePicture={profile?.profilePicture}
+              onPostCreated={loadFeed}
+            />
+            
+            {posts.length === 0 ? (
+              <Card className="border-2 border-orange-200">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No hay publicaciones aún. ¡Sé el primero en publicar!
+                </CardContent>
+              </Card>
+            ) : (
+              posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={user.uid}
+                  onDelete={loadFeed}
+                  onComment={setSelectedPostId}
+                  onHashtagClick={handleHashtagClick}
+                />
+              ))
+            )}
+          </div>
+        )}
+
+        {currentView === 'profile' && selectedUserId && (
+          <ProfileView
+            userId={selectedUserId}
+            isOwnProfile={selectedUserId === user.uid}
+            onCommentClick={setSelectedPostId}
+          />
+        )}
+
+        {currentView === 'notifications' && (
+  <NotificationsView
+    user={user} 
+    onNotificationClick={(notification) => {
+      if (notification.postId) {
+        setSelectedPostId(notification.postId);
+      } else if (notification.fromUserId) {
+        handleUserClick(notification.fromUserId);
+      }
+    }}
+  />
+)}
+
+        {currentView === 'search' && (
+          <div className="max-w-2xl mx-auto space-y-4">
+            <h2 className="text-orange-700">
+              {searchType === 'users' ? 'Usuarios encontrados' : 'Publicaciones encontradas'}
+            </h2>
+            
+            {searchType === 'users' ? (
+              searchResults.length === 0 ? (
+                <Card className="border-2 border-orange-200">
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    No se encontraron usuarios
+                  </CardContent>
+                </Card>
+              ) : (
+                searchResults.map((searchUser) => (
+                  <Card
+                    key={searchUser.id}
+                    className="border-2 border-orange-200 hover:border-orange-300 cursor-pointer transition-colors"
+                    onClick={() => handleUserClick(searchUser.id)}
+                  >
+                    <CardContent className="flex items-center gap-4 py-4">
+                      <Avatar className="h-12 w-12 border-2 border-orange-300">
+                        {searchUser.profilePicture && (
+                          <AvatarImage src={searchUser.profilePicture} alt={searchUser.name} />
+                        )}
+                        <AvatarFallback className="bg-gradient-to-br from-orange-400 to-amber-400 text-white">
+                          {searchUser.name?.charAt(0) || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-orange-700">{searchUser.name}</p>
+                        {searchUser.petName && (
+                          <p className="text-sm text-muted-foreground">
+                            {searchUser.petName} {searchUser.petType && `(${searchUser.petType})`}
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )
+            ) : (
+              posts.length === 0 ? (
+                <Card className="border-2 border-orange-200">
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    No se encontraron publicaciones
+                  </CardContent>
+                </Card>
+              ) : (
+                posts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    currentUserId={user.uid}
+                    onDelete={loadFeed}
+                    onComment={setSelectedPostId}
+                    onHashtagClick={handleHashtagClick}
+                  />
+                ))
+              )
+            )}
+          </div>
+        )}
+
+        {currentView === 'following' && (
+          <div className="max-w-2xl mx-auto space-y-4">
+            <h2 className="text-orange-700">Siguiendo</h2>
+            {followingUsers.length === 0 ? (
+              <Card className="border-2 border-orange-200">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No sigues a nadie aún
+                </CardContent>
+              </Card>
+            ) : (
+              followingUsers.map((followUser) => (
+                <Card
+                  key={followUser.id}
+                  className="border-2 border-orange-200 hover:border-orange-300 cursor-pointer transition-colors"
+                  onClick={() => handleUserClick(followUser.id)}
+                >
+                  <CardContent className="flex items-center gap-4 py-4">
+                    <Avatar className="h-12 w-12 border-2 border-orange-300">
+                      {followUser.profilePicture && (
+                        <AvatarImage src={followUser.profilePicture} alt={followUser.name} />
+                      )}
+                      <AvatarFallback className="bg-gradient-to-br from-orange-400 to-amber-400 text-white">
+                        {followUser.name?.charAt(0) || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="text-orange-700">{followUser.name}</p>
+                      {followUser.petName && (
+                        <p className="text-sm text-muted-foreground">
+                          {followUser.petName} {followUser.petType && `(${followUser.petType})`}
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
+
+        {currentView === 'discover' && (
+          <div className="max-w-2xl mx-auto space-y-4">
+            <h2 className="text-orange-700">Descubre usuarios nuevos</h2>
+            <p className="text-muted-foreground">Usuarios recomendados que podrías seguir</p>
+            {recommendedUsers.length === 0 ? (
+              <Card className="border-2 border-orange-200">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No hay recomendaciones disponibles
+                </CardContent>
+              </Card>
+            ) : (
+              recommendedUsers.map((recUser) => (
+                <Card
+                  key={recUser.id}
+                  className="border-2 border-orange-200 hover:border-orange-300 cursor-pointer transition-colors"
+                  onClick={() => handleUserClick(recUser.id)}
+                >
+                  <CardContent className="flex items-center gap-4 py-4">
+                    <Avatar className="h-12 w-12 border-2 border-orange-300">
+                      {recUser.profilePicture && (
+                        <AvatarImage src={recUser.profilePicture} alt={recUser.name} />
+                      )}
+                      <AvatarFallback className="bg-gradient-to-br from-orange-400 to-amber-400 text-white">
+                        {recUser.name?.charAt(0) || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="text-orange-700">{recUser.name}</p>
+                      {recUser.petName && (
+                        <p className="text-sm text-muted-foreground">
+                          {recUser.petName} {recUser.petType && `(${recUser.petType})`}
+                        </p>
+                      )}
+                      {recUser.bio && (
+                        <p className="text-sm text-muted-foreground mt-1">{recUser.bio}</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
+
+        {currentView === 'hashtag' && (
+          <div className="max-w-2xl mx-auto space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-orange-700">Publicaciones con {selectedHashtag}</h2>
+              <Button variant="ghost" onClick={() => setCurrentView('feed')}>
+                Volver al feed
+              </Button>
+            </div>
+            
+            {posts.length === 0 ? (
+              <Card className="border-2 border-orange-200">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No hay publicaciones con este hashtag
+                </CardContent>
+              </Card>
+            ) : (
+              posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={user.uid}
+                  onDelete={() => handleHashtagClick(selectedHashtag || '')}
+                  onComment={setSelectedPostId}
+                  onHashtagClick={handleHashtagClick}
+                />
+              ))
+            )}
+          </div>
+        )}
+
+        {currentView === 'settings' && (
+          <SettingsView
+            onAccountDeleted={handleLogout}
+            onUserClick={handleUserClick}
+          />
+        )}
+
+        {currentView === 'admin' && profile?.isAdmin && (
+          <AdminPanel
+            currentUserId={user.uid}
+            onUserClick={handleUserClick}
+          />
+        )}
+      </main>
+
+      <CommentsDialog
+        postId={selectedPostId}
+        onClose={() => setSelectedPostId(null)}
+      />
+
+      <Toaster />
+    </div>
+  );
+}
