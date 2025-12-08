@@ -8,13 +8,13 @@ import { Heart, MessageCircle, Trash2, Share2, Edit2, Globe, Users, Flag, MoreVe
 import { toast } from 'sonner@2.0.3';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { db } from '../firebase/firebase';
-import { doc, updateDoc, deleteDoc, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, collection, addDoc, getDocs, query, where, increment } from 'firebase/firestore';
 
 export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagClick }) {
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [isShared, setIsShared] = useState(post.isShared || false);
-  const [likesCount, setLikesCount] = useState(post.likesCount || 0);
-  const [sharesCount, setSharesCount] = useState(post.sharesCount || 0);
+  const [likesCount, setLikesCount] = useState(Math.max(0, post.likesCount || 0));
+  const [sharesCount, setSharesCount] = useState(Math.max(0, post.sharesCount || 0));
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content || '');
@@ -29,10 +29,20 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
       if (isLiked) {
         const likeDocs = await getDocs(query(likesRef, where('userId', '==', currentUserId)));
         likeDocs.forEach(async (docSnap) => await deleteDoc(doc(db, 'posts', post.id, 'likes', docSnap.id)));
+        
+        await updateDoc(postRef, {
+          likesCount: increment(-1)
+        });
+
         setIsLiked(false);
         setLikesCount(prev => Math.max(prev - 1, 0));
       } else {
         await addDoc(likesRef, { userId: currentUserId, createdAt: new Date() });
+        
+        await updateDoc(postRef, {
+          likesCount: increment(1)
+        });
+
         setIsLiked(true);
         setLikesCount(prev => prev + 1);
       }
@@ -48,11 +58,21 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
       if (isShared) {
         const shareDocs = await getDocs(query(sharesRef, where('userId', '==', currentUserId)));
         shareDocs.forEach(async (docSnap) => await deleteDoc(doc(db, 'posts', post.id, 'shares', docSnap.id)));
+        
+        await updateDoc(postRef, {
+          sharesCount: increment(-1)
+        });
+
         setIsShared(false);
         setSharesCount(prev => Math.max(prev - 1, 0));
         toast.success('Dejaste de compartir la publicación');
       } else {
         await addDoc(sharesRef, { userId: currentUserId, createdAt: new Date() });
+        
+        await updateDoc(postRef, {
+          sharesCount: increment(1)
+        });
+
         setIsShared(true);
         setSharesCount(prev => prev + 1);
         toast.success('Publicación compartida');

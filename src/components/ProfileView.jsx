@@ -107,13 +107,41 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
 
   const loadPosts = async () => {
     try {
+      // Simplificamos la query para evitar requerir un índice compuesto en Firestore
+      // Ordenaremos los posts en el cliente
       const postsQuery = query(
         collection(db, 'posts'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', userId)
       );
+      
       const snapshot = await getDocs(postsQuery);
       const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Ordenar por fecha descendente (más reciente primero)
+      postsData.sort((a, b) => {
+        // Manejar timestamps de Firestore o fechas normales
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return dateB - dateA;
+      });
+
+      // Cargar estado de likes y shares para cada post
+      if (currentUser) {
+        await Promise.all(postsData.map(async (post) => {
+          // Verificar Like
+          const likesRef = collection(db, 'posts', post.id, 'likes');
+          const likeQuery = query(likesRef, where('userId', '==', currentUser.uid));
+          const likeSnap = await getDocs(likeQuery);
+          post.isLiked = !likeSnap.empty;
+
+          // Verificar Share
+          const sharesRef = collection(db, 'posts', post.id, 'shares');
+          const shareQuery = query(sharesRef, where('userId', '==', currentUser.uid));
+          const shareSnap = await getDocs(shareQuery);
+          post.isShared = !shareSnap.empty;
+        }));
+      }
+
       setPosts(postsData);
     } catch (error) {
       console.error('Error loading posts:', error);

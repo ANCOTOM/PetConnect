@@ -1,0 +1,85 @@
+# PetConnect Project Explanation
+
+## Overview
+PetConnect is a social networking application designed specifically for pet lovers. It allows users to connect, share updates about their pets, and interact with a community of like-minded individuals. The application is built using React for the frontend and Firebase for the backend services (Authentication and Database).
+
+## Tech Stack
+- **Frontend Framework:** React (Vite)
+- **Styling:** Tailwind CSS
+- **UI Components:** Radix UI (via shadcn/ui)
+- **Backend/BaaS:** Firebase
+  - **Authentication:** Firebase Auth (Email/Password, OAuth providers)
+  - **Database:** Cloud Firestore (NoSQL database)
+- **Icons:** Lucide React
+
+## Project Structure
+The project follows a standard React application structure:
+
+- `src/`
+  - `App.jsx`: The main entry point and container for the application.
+  - `main.jsx`: Bootstraps the React application.
+  - `firebase/`: Contains Firebase configuration and initialization.
+  - `components/`: Contains all the React components used in the application.
+    - `ui/`: Reusable UI components (buttons, inputs, cards, etc.) based on shadcn/ui.
+  - `styles/`: Global styles and Tailwind configuration.
+
+## Key Components and Interactions
+
+### 1. App.jsx (Main Container)
+- **Role:** Acts as the central state manager and router for the application.
+- **State Management:**
+  - Manages the current authenticated user (`user`, `profile`).
+  - Controls the current view being displayed (Feed, Profile, Notifications, Settings, Admin).
+  - Fetches and manages the main feed of posts.
+- **Interactions:**
+  - Listens for Firebase Auth state changes to handle user sessions.
+  - Passes user data and navigation handlers down to child components.
+
+### 2. AuthForm.jsx (Authentication)
+- **Role:** Handles user registration and login.
+- **Features:**
+  - Supports Email/Password sign-up and sign-in.
+  - Integrates with OAuth providers (Google, Facebook, GitHub).
+  - Handles password reset functionality.
+- **Data Flow:**
+  - On successful registration, it creates a new document in the `users` Firestore collection with user details (name, pet name, pet type).
+
+### 3. CreatePostForm.jsx (Content Creation)
+- **Role:** Allows authenticated users to create new posts.
+- **Features:**
+  - Text input for post content.
+  - Support for Image and Video URLs.
+  - Visibility settings (Public/Private).
+- **Data Flow:**
+  - Writes a new document to the `posts` collection in Firestore.
+  - Includes metadata like `userId`, `authorName`, and `createdAt`.
+
+### 4. PostCard.jsx (Post Display)
+- **Role:** Renders an individual post and manages user interactions with it.
+- **Features:**
+  - Displays post content (text, media).
+  - Like functionality (toggles like status).
+  - Share functionality.
+  - Edit and Delete options for the post owner.
+  - Report functionality for inappropriate content.
+- **Data Flow:**
+  - Updates the `posts` document in Firestore (e.g., incrementing counters).
+  - Manages sub-collections for `likes` and `shares` within the post document to track user interactions.
+
+### 5. ProfileView.jsx (User Profile)
+- **Role:** Displays user information and their specific posts.
+- **Interactions:**
+  - Fetches user details from the `users` collection.
+  - Queries the `posts` collection for posts authored by the specific user.
+
+## Data Flow & State Management
+- **Global State:** `App.jsx` holds the "source of truth" for the user's session and the main feed data.
+- **Local State:** Individual components manage their own UI state (e.g., form inputs, loading states, toggle states).
+- **Backend Sync:** The application relies heavily on direct Firestore queries and real-time updates (where applicable) to keep the UI in sync with the backend data.
+
+## Database Schema (Inferred)
+- **users/**: Stores user profiles.
+- **posts/**: Stores all posts.
+  - **likes/** (Sub-collection): Tracks who liked the post.
+  - **shares/** (Sub-collection): Tracks who shared the post.
+- **reports/**: Stores reports filed against posts.
