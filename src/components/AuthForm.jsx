@@ -17,7 +17,7 @@ import {
   GithubAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 export function AuthForm({ onSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -25,41 +25,55 @@ export function AuthForm({ onSuccess }) {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
 
-const handleSignUp = async (e) => {
-  e.preventDefault();
-  setIsLoading(true);
-  setError('');
+  const [editForm, setEditForm] = useState({
+    petType: ''
+  });
+  const [petTypeCustom, setPetTypeCustom] = useState('');
 
-  const formData = new FormData(e.currentTarget);
-  const email = formData.get('email');
-  const password = formData.get('password');
-  const name = formData.get('name');
-  const petName = formData.get('petName');
-  const petType = formData.get('petType');
+  // ------------------------ SIGN UP ------------------------
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
 
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    console.log(' Usuario creado en Auth:', userCredential.user.uid);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email');
+    const password = formData.get('password');
+    const name = formData.get('name');
+    const petName = formData.get('petName');
 
-   
-    const userRef = doc(db, 'users', userCredential.user.uid);
-    await setDoc(userRef, {
-      name,
-      petName,
-      petType,
-      email,
-      createdAt: new Date()
-    });
-    console.log(' Usuario guardado en Firestore:', userRef.id);
+    const petTypeFinal = editForm.petType === 'Otro' ? petTypeCustom : editForm.petType;
 
-  } catch (err) {
-    console.error(' No funciona:', err);
-    setError(err.message);
-  } finally {
-    setIsLoading(false);
-  }
-};
+    try {
+      // Crear usuario en Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
+      // Guardar usuario en Firestore
+      const userRef = doc(db, 'users', userCredential.user.uid);
+      await setDoc(userRef, {
+        name: name || email.split('@')[0],
+        profilePicture: "",
+        petName: petName || "",
+        petType: petTypeFinal || "",
+        bio: "",
+        location: "",
+        email,
+        createdAt: new Date()
+      }, { merge: true });
+
+      onSuccess?.(userCredential.user);
+      toast.success('Registro exitoso');
+
+    } catch (err) {
+      console.error('Error en registro:', err);
+      setError(err.message);
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ------------------------ SIGN IN ------------------------
   const handleSignIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -81,31 +95,45 @@ const handleSignUp = async (e) => {
     }
   };
 
+  // ------------------------ OAuth ------------------------
   const handleOAuthSignIn = async (providerName) => {
     let provider;
     switch (providerName) {
-      case 'google':
-        provider = new GoogleAuthProvider();
-        break;
-      case 'facebook':
-        provider = new FacebookAuthProvider();
-        break;
-      case 'github':
-        provider = new GithubAuthProvider();
-        break;
-      default:
-        return;
+      case 'google': provider = new GoogleAuthProvider(); break;
+      case 'facebook': provider = new FacebookAuthProvider(); break;
+      case 'github': provider = new GithubAuthProvider(); break;
+      default: return;
     }
 
     try {
       const result = await signInWithPopup(auth, provider);
-      onSuccess(result.user);
+      const user = result.user;
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          name: user.displayName || user.email.split('@')[0],
+          profilePicture: user.photoURL || "",
+          petName: "",
+          petType: "",
+          bio: "",
+          location: "",
+          email: user.email,
+          createdAt: new Date()
+        }, { merge: true });
+      }
+
+      onSuccess?.(user);
+      toast.success('Login exitoso');
+
     } catch (err) {
       console.error('OAuth error:', err);
       toast.error(`Error al iniciar sesión con ${providerName}`);
     }
   };
 
+  // ------------------------ RESET PASSWORD ------------------------
   const handleResetPassword = async () => {
     if (!resetEmail) {
       toast.error('Por favor ingresa tu correo electrónico');
@@ -145,6 +173,7 @@ const handleSignUp = async (e) => {
               <TabsTrigger value="signup">Registrarse</TabsTrigger>
             </TabsList>
 
+            {/* ---------------- SIGN IN ---------------- */}
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
@@ -163,7 +192,7 @@ const handleSignUp = async (e) => {
                 >
                   {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
                 </Button>
-                
+
                 <Button type="button" variant="link" className="w-full text-orange-600" onClick={() => setShowResetDialog(true)}>
                   ¿Olvidaste tu contraseña?
                 </Button>
@@ -185,6 +214,7 @@ const handleSignUp = async (e) => {
               </form>
             </TabsContent>
 
+            {/* ---------------- SIGN UP ---------------- */}
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
@@ -205,9 +235,33 @@ const handleSignUp = async (e) => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-petType">Tipo de Mascota</Label>
-                  <Input id="signup-petType" name="petType" type="text" placeholder="Perro, Gato, etc." />
+                  <select
+                    id="signup-petType"
+                    name="petType"
+                    value={editForm.petType}
+                    onChange={(e) => setEditForm({ ...editForm, petType: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-2 py-1"
+                  >
+                    <option value="">Selecciona una opción</option>
+                    <option value="Perro">Perro</option>
+                    <option value="Gato">Gato</option>
+                    <option value="Pez">Pez</option>
+                    <option value="Iguana">Iguana</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+
+                  {editForm.petType === 'Otro' && (
+                    <Input
+                      type="text"
+                      placeholder="Escribe el tipo de mascota"
+                      value={petTypeCustom}
+                      onChange={(e) => setPetTypeCustom(e.target.value)}
+                    />
+                  )}
                 </div>
+
                 {error && <div className="text-red-500 text-sm">{error}</div>}
+
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"

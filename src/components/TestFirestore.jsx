@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "../firebase/firebase"; // Ajusta según tu ruta
+import { db } from "../firebase/firebase";
 
 export default function TestFirestore() {
   useEffect(() => {

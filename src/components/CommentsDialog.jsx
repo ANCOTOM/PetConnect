@@ -5,7 +5,8 @@ import { Textarea } from './ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Send } from 'lucide-react';
 import { auth, db } from '../firebase/firebase';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDoc, doc, updateDoc, increment } from 'firebase/firestore';
+
 
 export function CommentsDialog({ postId, onClose }) {
   const [comments, setComments] = useState([]);
@@ -34,26 +35,51 @@ export function CommentsDialog({ postId, onClose }) {
   }, [postId]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!newComment.trim() || !auth.currentUser) return;
+  e.preventDefault();
+  if (!newComment.trim() || !auth.currentUser) return;
 
-    setIsSubmitting(true);
-    try {
-      await addDoc(collection(db, 'posts', postId, 'comments'), {
-        content: newComment.trim(),
-        authorId: auth.currentUser.uid,
-        authorName: auth.currentUser.displayName || 'Usuario',
-        authorPhoto: auth.currentUser.photoURL || '',
-        createdAt: serverTimestamp()
+  setIsSubmitting(true);
+  try {
+    //  desde Firestore
+    const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+    const userName = userDoc.exists() ? userDoc.data().name : 'Usuario';
+    const userPhoto = userDoc.exists() ? userDoc.data().profilePicture : '';
+
+    //  comentario
+    await addDoc(collection(db, 'posts', postId, 'comments'), {
+      content: newComment.trim(),
+      authorId: auth.currentUser.uid,
+      authorName: userName,
+      authorPhoto: userPhoto,
+      createdAt: serverTimestamp()
+    });
+
+    // INCREMENTAR CONTADOR DE 
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, {
+      commentsCount: increment(1)
+    });
+
+    
+    // Notificacion 
+    const postDoc = await getDoc(postRef);
+    const postAuthorId = postDoc.exists() ? postDoc.data().userId : null;
+    if (postAuthorId && postAuthorId !== auth.currentUser.uid) { // no notificarse a sí mismo
+      await createNotification({
+        toUserId: postAuthorId,
+        type: 'comment',
+        fromUserId: auth.currentUser.uid,
+        fromUserName: userName,
+        postId: postId
       });
-      setNewComment('');
-    } catch (error) {
-      console.error('Error creating comment:', error);
-    } finally {
-      setIsSubmitting(false);
     }
-  };
-
+    setNewComment('');
+  } catch (error) {
+    console.error('Error creating comment:', error);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const formatDate = (timestamp) => {
     if (!timestamp) return '';
     const date = timestamp.toDate();

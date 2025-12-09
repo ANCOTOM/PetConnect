@@ -8,6 +8,7 @@ import { Textarea } from './ui/textarea';
 import { Edit2, MapPin, PawPrint, Flag, UserPlus, UserMinus } from 'lucide-react';
 import { PostCard } from './PostCard';
 import { toast } from 'sonner';
+import { createNotification } from '../firebase/notifications';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -165,42 +166,50 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
   };
 
   const handleFollow = async () => {
-    if (!currentUser) return;
+  if (!currentUser) return;
 
-    try {
-      if (isFollowing) {
-        // Unfollow
-        const followQuery = query(
-          collection(db, 'follows'),
-          where('followerId', '==', currentUser.uid),
-          where('followingId', '==', userId)
-        );
-        const snapshot = await getDocs(followQuery);
-        
-        for (const docSnap of snapshot.docs) {
-          await deleteDoc(doc(db, 'follows', docSnap.id));
-        }
-        
-        setIsFollowing(false);
-        setStats(prev => ({ ...prev, followersCount: Math.max(prev.followersCount - 1, 0) }));
-        toast.success('Dejaste de seguir');
-      } else {
-        // Follow
-        await addDoc(collection(db, 'follows'), {
-          followerId: currentUser.uid,
-          followingId: userId,
-          createdAt: serverTimestamp()
-        });
-        
-        setIsFollowing(true);
-        setStats(prev => ({ ...prev, followersCount: prev.followersCount + 1 }));
-        toast.success('Ahora sigues a este usuario');
+  try {
+    if (isFollowing) {
+      // Unfollow
+      const followQuery = query(
+        collection(db, 'follows'),
+        where('followerId', '==', currentUser.uid),
+        where('followingId', '==', userId)
+      );
+      const snapshot = await getDocs(followQuery);
+
+      for (const docSnap of snapshot.docs) {
+        await deleteDoc(doc(db, 'follows', docSnap.id));
       }
-    } catch (error) {
-      console.error('Error following/unfollowing:', error);
-      toast.error('Error al actualizar seguimiento');
+
+      setIsFollowing(false);
+      setStats(prev => ({ ...prev, followersCount: Math.max(prev.followersCount - 1, 0) }));
+      toast.success('Dejaste de seguir');
+    } else {
+      // Follow
+      await addDoc(collection(db, 'follows'), {
+        followerId: currentUser.uid,
+        followingId: userId,
+        createdAt: serverTimestamp()
+      });
+
+      setIsFollowing(true);
+      setStats(prev => ({ ...prev, followersCount: prev.followersCount + 1 }));
+      toast.success('Ahora sigues a este usuario');
+
+      // Crear notificación de follow
+      await createNotification({
+        toUserId: userId, // el usuario que estás siguiendo
+        type: 'follow',
+        fromUserId: currentUser.uid,
+        fromUserName: currentUser.displayName || 'Usuario'
+      });
     }
-  };
+  } catch (error) {
+    console.error('Error following/unfollowing:', error);
+    toast.error('Error al actualizar seguimiento');
+  }
+};
 
   const handleSaveProfile = async () => {
     try {
