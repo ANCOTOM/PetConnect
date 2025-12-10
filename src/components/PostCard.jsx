@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
@@ -8,14 +8,14 @@ import { Heart, MessageCircle, Trash2, Share2, Edit2, Globe, Users, Flag, MoreVe
 import { toast } from 'sonner@2.0.3';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { db } from '../firebase/firebase';
-import { doc, updateDoc, deleteDoc, collection, addDoc, getDocs, query, where, increment } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, collection, addDoc, getDocs, query, where, increment } from 'firebase/firestore';
 import { createNotification } from '../firebase/notifications';
 
 export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagClick, onUserClick }) {
-  const [isLiked, setIsLiked] = useState(post.isLiked || false);
-  const [isShared, setIsShared] = useState(post.isShared || false);
-  const [likesCount, setLikesCount] = useState(Math.max(0, post.likesCount || 0));
-  const [sharesCount, setSharesCount] = useState(Math.max(0, post.sharesCount || 0));
+  const [isLiked, setIsLiked] = useState(false);
+  const [isShared, setIsShared] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [sharesCount, setSharesCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content || '');
@@ -23,6 +23,25 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
   const [reportReason, setReportReason] = useState('');
 
   const postRef = doc(db, 'posts', post.id);
+
+  // Desde desde Firestore
+  useEffect(() => {
+    const fetchLikesShares = async () => {
+      try {
+        const likesSnapshot = await getDocs(collection(db, 'posts', post.id, 'likes'));
+        const sharesSnapshot = await getDocs(collection(db, 'posts', post.id, 'shares'));
+
+        setLikesCount(likesSnapshot.size);
+        setSharesCount(sharesSnapshot.size);
+
+        setIsLiked(likesSnapshot.docs.some(doc => doc.data().userId === currentUserId));
+        setIsShared(sharesSnapshot.docs.some(doc => doc.data().userId === currentUserId));
+      } catch (error) {
+        console.error('Error fetching likes/shares:', error);
+      }
+    };
+    fetchLikesShares();
+  }, [post.id, currentUserId]);
 
   const handleLike = async () => {
     try {
@@ -36,29 +55,33 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
         await updateDoc(postRef, { likesCount: increment(-1) });
         setIsLiked(false);
         setLikesCount(prev => Math.max(prev - 1, 0));
+        toast.success('Ya no te gusta la publicación');
       } else {
         await addDoc(likesRef, { userId: currentUserId, createdAt: new Date() });
         await updateDoc(postRef, { likesCount: increment(1) });
         setIsLiked(true);
         setLikesCount(prev => prev + 1);
+        toast.success('Te gusta la publicación');
 
-       
         if (post.userId !== currentUserId) {
           try {
+            const userDoc = await getDoc(doc(db, 'users', currentUserId));
+            const fromUserName = userDoc.exists() ? userDoc.data().name : 'Usuario';
+
             await createNotification({
               toUserId: post.userId,
               type: 'like',
               fromUserId: currentUserId,
-              fromUserName: post.author?.name || 'Usuario',
+              fromUserName,
               postId: post.id
             });
           } catch (error) {
-            console.error('Error creating like notification:', error);
+            console.error('Error creando la notificación de like:', error);
           }
         }
       }
     } catch (error) {
-      console.error('Error liking/unliking post:', error);
+      console.error('Error al dar like:', error);
       toast.error('Error al dar like');
     }
   };
@@ -85,20 +108,23 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
 
         if (post.userId !== currentUserId) {
           try {
+            const userDoc = await getDoc(doc(db, 'users', currentUserId));
+            const fromUserName = userDoc.exists() ? userDoc.data().name : 'Usuario';
+
             await createNotification({
               toUserId: post.userId,
               type: 'share',
               fromUserId: currentUserId,
-              fromUserName: post.author?.name || 'Usuario',
+              fromUserName,
               postId: post.id
             });
           } catch (error) {
-            console.error('Error creating share notification:', error);
+            console.error('Error creando la notificación de share:', error);
           }
         }
       }
     } catch (error) {
-      console.error('Error sharing post:', error);
+      console.error('Error al compartir:', error);
       toast.error('Error al compartir');
     }
   };
@@ -111,20 +137,20 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
       toast.success('Publicación actualizada');
       onDelete?.();
     } catch (error) {
-      console.error('Error editing post:', error);
+      console.error('Error al editar:', error);
       toast.error('Error al editar');
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('¿Estás seguro de que quieres eliminar esta publicación?')) return;
+    if (!confirm('¿Estás seguro de eliminar esta publicación?')) return;
     setIsDeleting(true);
     try {
       await deleteDoc(postRef);
       toast.success('Publicación eliminada');
       onDelete?.();
     } catch (error) {
-      console.error('Error deleting post:', error);
+      console.error('Error al eliminar:', error);
       toast.error('Error al eliminar');
     } finally {
       setIsDeleting(false);
@@ -133,7 +159,7 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
 
   const handleReportPost = async () => {
     if (!reportReason.trim()) {
-      toast.error('Por favor describe el motivo del reporte');
+      toast.error('Describe el motivo del reporte');
       return;
     }
     try {
@@ -147,7 +173,7 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
       setReportReason('');
       setShowReportDialog(false);
     } catch (error) {
-      console.error('Error reporting post:', error);
+      console.error('Error al reportar:', error);
       toast.error('Error al reportar publicación');
     }
   };
@@ -217,7 +243,6 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
             <p className="text-xs text-muted-foreground">{formatDate(post.createdAt)}</p>
           </div>
 
-          {/* Menú de opciones */}
           {post.userId === currentUserId ? (
             <div className="flex gap-1">
               <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} className="text-orange-500 hover:text-orange-600 hover:bg-orange-50">
@@ -264,10 +289,8 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
             {sharesCount}
           </Button>
         </CardFooter>
-
       </Card>
 
-      {/* Diálogos de editar y reportar */}
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
         <DialogContent>
           <DialogHeader>

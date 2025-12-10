@@ -30,7 +30,7 @@ export function AuthForm({ onSuccess }) {
   });
   const [petTypeCustom, setPetTypeCustom] = useState('');
 
-  // ------------------------ SIGN UP ------------------------
+ 
   const handleSignUp = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -73,7 +73,7 @@ export function AuthForm({ onSuccess }) {
     }
   };
 
-  // ------------------------ SIGN IN ------------------------
+  
   const handleSignIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -95,7 +95,7 @@ export function AuthForm({ onSuccess }) {
     }
   };
 
-  // ------------------------ OAuth ------------------------
+ 
   const handleOAuthSignIn = async (providerName) => {
     let provider;
     switch (providerName) {
@@ -133,7 +133,7 @@ export function AuthForm({ onSuccess }) {
     }
   };
 
-  // ------------------------ RESET PASSWORD ------------------------
+ 
   const handleResetPassword = async () => {
     if (!resetEmail) {
       toast.error('Por favor ingresa tu correo electrónico');
@@ -214,7 +214,7 @@ export function AuthForm({ onSuccess }) {
               </form>
             </TabsContent>
 
-            {/* ---------------- SIGN UP ---------------- */}
+           
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
@@ -275,7 +275,7 @@ export function AuthForm({ onSuccess }) {
         </CardContent>
       </Card>
 
-      {/* Reset Password Dialog */}
+  
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <DialogContent>
           <DialogHeader>

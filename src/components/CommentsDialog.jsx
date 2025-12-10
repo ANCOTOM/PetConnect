@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Send } from 'lucide-react';
 import { auth, db } from '../firebase/firebase';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import { createNotification } from '../firebase/notifications';
 
 
 export function CommentsDialog({ postId, onClose }) {
@@ -64,7 +65,7 @@ export function CommentsDialog({ postId, onClose }) {
     // Notificacion 
     const postDoc = await getDoc(postRef);
     const postAuthorId = postDoc.exists() ? postDoc.data().userId : null;
-    if (postAuthorId && postAuthorId !== auth.currentUser.uid) { // no notificarse a sí mismo
+    if (postAuthorId && postAuthorId !== auth.currentUser.uid) { 
       await createNotification({
         toUserId: postAuthorId,
         type: 'comment',

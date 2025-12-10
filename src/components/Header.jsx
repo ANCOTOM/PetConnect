@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Input } from './ui/input';
@@ -9,8 +10,6 @@ import { Badge } from './ui/badge';
 export function Header({ 
   userName,
   userProfilePicture, 
-  currentView, 
-  onViewChange, 
   onSearch, 
   onLogout,
   notificationsCount = 0,
@@ -18,13 +17,18 @@ export function Header({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState('users');
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       onSearch(searchQuery.trim(), searchType);
+      setSearchQuery('');
     }
   };
+
+  const isActive = (path) => location.pathname === path;
 
   return (
     <header className="sticky top-0 z-50 bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg">
@@ -32,7 +36,7 @@ export function Header({
         <div className="flex items-center justify-between gap-4">
 
           {/* Logo */}
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => onViewChange('feed')}>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
             <div className="bg-white p-2 rounded-full">
               <PawPrint className="h-6 w-6 text-orange-500" />
             </div>
@@ -67,29 +71,29 @@ export function Header({
           <nav className="flex items-center gap-2">
 
             <Button
-              variant={currentView === 'feed' ? 'secondary' : 'ghost'}
+              variant={isActive('/') ? 'secondary' : 'ghost'}
               size="icon"
-              onClick={() => onViewChange('feed')}
-              className={currentView === 'feed' ? '' : 'text-white hover:bg-white/20'}
+              onClick={() => navigate('/')}
+              className={isActive('/') ? '' : 'text-white hover:bg-white/20'}
             >
               <Home className="h-5 w-5" />
             </Button>
 
             <Button
-              variant={currentView === 'following' ? 'secondary' : 'ghost'}
+              variant={isActive('/following') ? 'secondary' : 'ghost'}
               size="icon"
-              onClick={() => onViewChange('following')}
-              className={currentView === 'following' ? '' : 'text-white hover:bg-white/20'}
+              onClick={() => navigate('/following')}
+              className={isActive('/following') ? '' : 'text-white hover:bg-white/20'}
               title="Siguiendo"
             >
               <Users className="h-5 w-5" />
             </Button>
 
             <Button
-              variant={currentView === 'discover' ? 'secondary' : 'ghost'}
+              variant={isActive('/discover') ? 'secondary' : 'ghost'}
               size="icon"
-              onClick={() => onViewChange('discover')}
-              className={currentView === 'discover' ? '' : 'text-white hover:bg-white/20'}
+              onClick={() => navigate('/discover')}
+              className={isActive('/discover') ? '' : 'text-white hover:bg-white/20'}
               title="Descubrir"
             >
               <Sparkles className="h-5 w-5" />
@@ -97,10 +101,10 @@ export function Header({
 
             <div className="relative">
               <Button
-                variant={currentView === 'notifications' ? 'secondary' : 'ghost'}
+                variant={isActive('/notifications') ? 'secondary' : 'ghost'}
                 size="icon"
-                onClick={() => onViewChange('notifications')}
-                className={currentView === 'notifications' ? '' : 'text-white hover:bg-white/20'}
+                onClick={() => navigate('/notifications')}
+                className={isActive('/notifications') ? '' : 'text-white hover:bg-white/20'}
               >
                 <Bell className="h-5 w-5" />
               </Button>
@@ -115,19 +119,19 @@ export function Header({
             </div>
 
             <Button
-              variant={currentView === 'profile' ? 'secondary' : 'ghost'}
+              variant={isActive(/^\/profile/) ? 'secondary' : 'ghost'}
               size="icon"
-              onClick={() => onViewChange('profile')}
-              className={currentView === 'profile' ? '' : 'text-white hover:bg-white/20'}
+              onClick={() => navigate(`/profile/`)}
+              className={isActive(/^\/profile/) ? '' : 'text-white hover:bg-white/20'}
             >
               <User className="h-5 w-5" />
             </Button>
 
             <Button
-              variant={currentView === 'settings' ? 'secondary' : 'ghost'}
+              variant={isActive('/settings') ? 'secondary' : 'ghost'}
               size="icon"
-              onClick={() => onViewChange('settings')}
-              className={currentView === 'settings' ? '' : 'text-white hover:bg-white/20'}
+              onClick={() => navigate('/settings')}
+              className={isActive('/settings') ? '' : 'text-white hover:bg-white/20'}
               title="Configuración"
             >
               <Settings className="h-5 w-5" />
@@ -135,10 +139,10 @@ export function Header({
 
             {isAdmin && (
               <Button
-                variant={currentView === 'admin' ? 'secondary' : 'ghost'}
+                variant={isActive('/admin') ? 'secondary' : 'ghost'}
                 size="icon"
-                onClick={() => onViewChange('admin')}
-                className={currentView === 'admin' ? '' : 'text-white hover:bg-white/20'}
+                onClick={() => navigate('/admin')}
+                className={isActive('/admin') ? '' : 'text-white hover:bg-white/20'}
                 title="Panel de Administración"
               >
                 <Shield className="h-5 w-5" />
@@ -156,7 +160,7 @@ export function Header({
 
             <Avatar 
               className="h-9 w-9 border-2 border-white cursor-pointer" 
-              onClick={() => onViewChange('profile')}
+              onClick={() => navigate('/profile')}
             >
               {userProfilePicture && (
                 <AvatarImage src={userProfilePicture} alt={userName} />
