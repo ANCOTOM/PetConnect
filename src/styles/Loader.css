@@ -1,0 +1,20 @@
+.loader-gif {
+  position: absolute;   
+  top: 50%;             
+  left: 50%;            
+  transform: translate(-50%, -50%); 
+  width: 400px;         
+  height: 400px;
+  object-fit: contain;
+}
+
+
+.cargando-texto {
+  position: relative; /* relativo al contenedor principal */
+  z-index: 10;        /* para que quede encima del GIF */
+  margin-top: 200px;  /* ajusta este valor hasta donde quieras */
+  text-align: center;
+  color: #ea580c;     /* text-orange-700 de Tailwind */
+  font-size: 1.25rem; /* text-xl */
+  font-weight: 600;  
+}

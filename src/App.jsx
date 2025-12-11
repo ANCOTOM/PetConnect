@@ -12,6 +12,7 @@ import { CommentsDialog } from './components/CommentsDialog';
 import { Card, CardContent } from './components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './components/ui/avatar';
 import { Toaster } from './components/ui/sonner';
+import './styles/Loader.css';
 
 // Firebase imports
 import { auth, db } from './firebase/firebase';
@@ -327,17 +328,24 @@ export default function App() {
   const handleUserClick = (userId) => {
     navigate(`/profile/${userId}`);
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-100 via-yellow-50 to-amber-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-orange-700">Cargando...</p>
-        </div>
+if (isLoading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-100 via-yellow-50 to-amber-100">
+      <img 
+        src="/Dog chasing tail.gif" 
+        alt="Perro persiguiendo su cola" 
+        className="loader-gif"
+      />
+      <div className="cargando-texto">
+        <p>Cargando...</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
+
+
+
 
  
   function ProfileRoute() {
