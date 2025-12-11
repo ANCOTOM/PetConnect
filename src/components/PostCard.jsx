@@ -164,9 +164,10 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
     }
     try {
       await addDoc(collection(db, 'reports'), {
-        postId: post.id,
+        reportedPostId: post.id,
         reason: reportReason,
         reportedBy: currentUserId,
+        status: 'pending',
         createdAt: new Date()
       });
       toast.success('Publicación reportada correctamente');

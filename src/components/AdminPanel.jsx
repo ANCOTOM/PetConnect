@@ -99,7 +99,10 @@ export function AdminPanel({ currentUserId, onUserClick }) {
       const reportsSnapshot = await getDocs(collection(db, 'reports'));
       const totalReports = reportsSnapshot.size;
       const pendingReports = reportsSnapshot.docs.filter(
-        doc => doc.data().status === 'pending'
+        doc => {
+          const data = doc.data();
+          return data.status === 'pending' || !data.status;
+        }
       ).length;
 
       setStats({
@@ -123,9 +126,16 @@ export function AdminPanel({ currentUserId, onUserClick }) {
       for (const reportDoc of reportsSnapshot.docs) {
         const reportData = { id: reportDoc.id, ...reportDoc.data() };
 
+        // Normalizar datos para reportes antiguos
+        if (!reportData.status) reportData.status = 'pending';
+        if (reportData.postId && !reportData.reportedPostId) {
+          reportData.reportedPostId = reportData.postId;
+        }
+
         // Cargar info del reportador
-        if (reportData.reporterId) {
-          const reporterDoc = await getDoc(doc(db, 'users', reportData.reporterId));
+        if (reportData.reporterId || reportData.reportedBy) {
+          const reporterId = reportData.reporterId || reportData.reportedBy;
+          const reporterDoc = await getDoc(doc(db, 'users', reporterId));
           reportData.reporter = reporterDoc.exists() ? reporterDoc.data() : null;
         }
 
