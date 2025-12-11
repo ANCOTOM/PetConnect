@@ -15,7 +15,8 @@ import {
   GoogleAuthProvider,
   FacebookAuthProvider,
   GithubAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signOut
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -85,11 +86,23 @@ export function AuthForm({ onSuccess }) {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Verificar si el usuario está suspendido
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      if (userDoc.exists() && userDoc.data().suspended) {
+        await signOut(auth);
+        // El toast se maneja globalmente en App.jsx para evitar duplicados
+        return;
+      }
+
       onSuccess(userCredential.user);
     } catch (err) {
       console.error('Sign in error:', err);
-      setError(err.message);
-      toast.error(err.message);
+      // Evitar sobrescribir el error si ya lo establecimos manualmente
+      if (!error) {
+        setError(err.message);
+        toast.error(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -110,6 +123,13 @@ export function AuthForm({ onSuccess }) {
       const user = result.user;
       const userRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userRef);
+
+      // Verificar si el usuario está suspendido
+      if (userSnap.exists() && userSnap.data().suspended) {
+        await signOut(auth);
+        // El toast se maneja globalmente en App.jsx para evitar duplicados
+        return;
+      }
 
       if (!userSnap.exists()) {
         await setDoc(userRef, {

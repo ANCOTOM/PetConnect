@@ -38,6 +38,7 @@ import {
   deleteDoc,
   query,
   where,
+  orderBy,
   serverTimestamp
 } from 'firebase/firestore';
 
@@ -45,7 +46,13 @@ export function AdminPanel({ currentUserId, onUserClick }) {
   const [stats, setStats] = useState(null);
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [activeTab, setActiveTab] = useState('reports');
+  const [reportFilter, setReportFilter] = useState('all');
+  const [userFilter, setUserFilter] = useState('all');
 
   useEffect(() => {
     loadAdminData();
@@ -53,11 +60,25 @@ export function AdminPanel({ currentUserId, onUserClick }) {
 
   const loadAdminData = async () => {
     try {
-      await Promise.all([loadStats(), loadReports(), loadUsers()]);
+      await Promise.all([loadStats(), loadReports(), loadUsers(), loadAllPosts()]);
     } catch (error) {
       console.error('Error loading admin data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadAllPosts = async () => {
+    try {
+      const postsSnapshot = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc')));
+      const postsData = postsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPosts(postsData);
+    } catch (error) {
+      console.error('Error loading posts:', error);
+      toast.error('Error al cargar publicaciones');
     }
   };
 
@@ -218,6 +239,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
       toast.success('Publicación eliminada');
       loadReports();
       loadStats();
+      loadAllPosts();
     } catch (error) {
       console.error('Error deleting post:', error);
       toast.error('Error al eliminar publicación');
@@ -273,7 +295,13 @@ export function AdminPanel({ currentUserId, onUserClick }) {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="border-2 border-blue-200">
+        <Card 
+          className={`border-2 border-blue-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'users' && userFilter === 'all' ? 'ring-2 ring-blue-400' : ''}`}
+          onClick={() => {
+            setActiveTab('users');
+            setUserFilter('all');
+          }}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-blue-600" />
@@ -285,7 +313,10 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-green-200">
+        <Card 
+          className={`border-2 border-green-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'posts' ? 'ring-2 ring-green-400' : ''}`}
+          onClick={() => setActiveTab('posts')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-green-600" />
@@ -297,7 +328,13 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-yellow-200">
+        <Card 
+          className={`border-2 border-yellow-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'reports' && reportFilter === 'all' ? 'ring-2 ring-yellow-400' : ''}`}
+          onClick={() => {
+            setActiveTab('reports');
+            setReportFilter('all');
+          }}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
@@ -309,7 +346,13 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-red-200">
+        <Card 
+          className={`border-2 border-red-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'reports' && reportFilter === 'pending' ? 'ring-2 ring-red-400' : ''}`}
+          onClick={() => {
+            setActiveTab('reports');
+            setReportFilter('pending');
+          }}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -321,7 +364,13 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-purple-200">
+        <Card 
+          className={`border-2 border-purple-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'users' && userFilter === 'suspended' ? 'ring-2 ring-purple-400' : ''}`}
+          onClick={() => {
+            setActiveTab('users');
+            setUserFilter('suspended');
+          }}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <Ban className="h-5 w-5 text-purple-600" />
@@ -334,10 +383,11 @@ export function AdminPanel({ currentUserId, onUserClick }) {
         </Card>
       </div>
 
-      <Tabs defaultValue="reports" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="reports">Reportes</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="posts">Publicaciones</TabsTrigger>
         </TabsList>
 
         {/* REPORTES */}
@@ -354,193 +404,199 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                 <p className="text-center text-muted-foreground py-8">No hay reportes</p>
               ) : (
                 <div className="space-y-4">
-                  {reports.map((report) => (
+                  {reports
+                    .filter(report => reportFilter === 'all' || report.status === reportFilter)
+                    .map((report) => (
                     <Card key={report.id} className="border border-orange-200">
-                      <CardContent className="pt-4">
-                        <div className="space-y-3">
-                          {/* Encabezado reporte */}
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Badge
-                                  variant={
-                                    report.status === 'pending'
-                                      ? 'default'
-                                      : report.status === 'resolved'
-                                      ? 'secondary'
-                                      : 'secondary'
-                                  }
-                                >
-                                  {report.status === 'pending'
-                                    ? 'Pendiente'
-                                    : report.status === 'resolved'
-                                    ? 'Resuelto'
-                                    : 'Rechazado'}
-                                </Badge>
+                      <CardContent className="py-4">
+                        <div 
+                          className="flex items-center justify-between cursor-pointer"
+                          onClick={() => setSelectedReport(selectedReport === report.id ? null : report.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Badge
+                              variant={
+                                report.status === 'pending'
+                                  ? 'destructive'
+                                  : report.status === 'resolved'
+                                  ? 'default'
+                                  : 'secondary'
+                              }
+                            >
+                              {report.status === 'pending'
+                                ? 'Pendiente'
+                                : report.status === 'resolved'
+                                ? 'Resuelto'
+                                : 'Rechazado'}
+                            </Badge>
 
-                                <Badge variant="outline">
-                                  {report.type === 'user' ? 'Usuario' : 'Publicación'}
-                                </Badge>
-                              </div>
-
-                              <p className="text-sm text-muted-foreground">
-                                Reportado por:{' '}
-                                <span className="text-orange-700">
-                                  {report.reporter?.name || 'Desconocido'}
-                                </span>
+                            <div>
+                              <p className="font-medium text-orange-900">
+                                Reporte #{report.id.slice(0, 6)}
                               </p>
-
                               <p className="text-sm text-muted-foreground">
-                                Fecha: {formatDate(report.createdAt)}
+                                {report.createdAt?.toDate?.().toLocaleDateString()}
                               </p>
                             </div>
                           </div>
 
-                          {/* Motivo */}
-                          <div className="bg-orange-50 p-3 rounded-lg">
-                            <p className="text-sm">
-                              <span className="text-orange-700">Motivo:</span> {report.reason}
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-orange-800">
+                              {report.type === 'user' ? 'Usuario' : 'Publicación'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Por: {report.reporter?.name || 'Desconocido'}
                             </p>
                           </div>
+                        </div>
 
-                          {/* Si es reporte de usuario */}
-                          {report.type === 'user' && report.reported && (
-                            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                              <Avatar className="h-8 w-8 border-2 border-orange-300">
-                                {report.reported.profilePicture && (
-                                  <AvatarImage
-                                    src={report.reported.profilePicture}
-                                    alt={report.reported.name}
-                                  />
-                                )}
-                                <AvatarFallback className="bg-gradient-to-br from-orange-400 to-amber-400 text-white">
-                                  {report.reported.name?.charAt(0) || 'U'}
-                                </AvatarFallback>
-                              </Avatar>
-
-                              <div>
-                                <p
-                                  className="text-sm cursor-pointer text-orange-700 hover:underline"
-                                  onClick={() => onUserClick(report.reportedUserId)}
-                                >
-                                  {report.reported.name}
-                                </p>
-
-                                {report.reported.suspended && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Suspendido
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Si es reporte de publicación */}
-                          {report.type === 'post' && report.reported && (
-                            <div className="p-2 bg-gray-50 rounded">
-                              <p className="text-sm line-clamp-2">
-                                {report.reported.content || 'Contenido multimedia'}
+                        {/* Contenido Expandible */}
+                        {selectedReport === report.id && (
+                          <div className="mt-4 pt-4 border-t border-orange-100 space-y-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="bg-orange-50 p-3 rounded-md">
+                              <p className="text-sm font-medium text-orange-800 mb-1">
+                                Motivo del reporte:
+                              </p>
+                              <p className="text-sm text-orange-700">
+                                {report.reason}
                               </p>
                             </div>
-                          )}
 
-                          {/* Acciones de admin */}
-                          {report.status === 'pending' && (
-                            <div className="flex gap-2">
-                              {/* Suspender usuario */}
-                              {report.type === 'user' && (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button size="sm" variant="destructive">
-                                      <Ban className="h-4 w-4 mr-2" />
-                                      Suspender Usuario
-                                    </Button>
-                                  </AlertDialogTrigger>
+                            {report.type === 'post' && report.reported && (
+                              <div className="bg-white border border-orange-100 p-3 rounded-md">
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  Contenido reportado:
+                                </p>
+                                <p className="text-sm">{report.reported.content}</p>
+                                {report.reported.imageUrl && (
+                                  <img
+                                    src={report.reported.imageUrl}
+                                    alt="Reported content"
+                                    className="mt-2 h-32 w-auto rounded-md object-cover"
+                                  />
+                                )}
+                              </div>
+                            )}
 
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>
-                                        ¿Suspender usuario?
-                                      </AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        El usuario será suspendido y no podrá acceder a su
-                                        cuenta.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
+                            {report.type === 'user' && report.reported && (
+                              <div className="flex items-center gap-3 bg-white border border-orange-100 p-3 rounded-md">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage src={report.reported.profilePicture} />
+                                  <AvatarFallback>{report.reported.name?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="text-sm font-medium">{report.reported.name}</p>
+                                  <p className="text-xs text-muted-foreground">{report.reported.email}</p>
+                                </div>
+                              </div>
+                            )}
 
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={async () => {
-                                          await handleSuspendUser(report.reportedUserId);
-                                          await handleResolveReport(
-                                            report.id,
-                                            'resolved'
-                                          );
-                                        }}
-                                        className="bg-red-600 hover:bg-red-700"
+                            {report.status === 'pending' && (
+                              <div className="flex gap-2 justify-end pt-2">
+                                {/* Acciones de resolución */}
+                                {report.type === 'user' && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
                                       >
-                                        Suspender
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              )}
+                                        <Ban className="h-4 w-4 mr-1" />
+                                        Suspender Usuario
+                                      </Button>
+                                    </AlertDialogTrigger>
 
-                              {/* Eliminar publicación */}
-                              {report.type === 'post' && (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button size="sm" variant="destructive">
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Eliminar Publicación
-                                    </Button>
-                                  </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                          ¿Suspender usuario reportado?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          El usuario será suspendido y el reporte marcado
+                                          como resuelto.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
 
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>
-                                        ¿Eliminar publicación?
-                                      </AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        La publicación será eliminada permanentemente.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={async () => {
+                                            await handleSuspendUser(
+                                              report.reportedUserId
+                                            );
+                                            await handleResolveReport(
+                                              report.id,
+                                              'resolved'
+                                            );
+                                          }}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          Suspender
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
 
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={async () => {
-                                          await handleDeletePost(
-                                            report.reportedPostId
-                                          );
-                                          await handleResolveReport(
-                                            report.id,
-                                            'resolved'
-                                          );
-                                        }}
-                                        className="bg-red-600 hover:bg-red-700"
+                                {report.type === 'post' && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
                                       >
-                                        Eliminar
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              )}
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Eliminar Post
+                                      </Button>
+                                    </AlertDialogTrigger>
 
-                              {/* Rechazar */}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  handleResolveReport(report.id, 'rejected')
-                                }
-                              >
-                                Rechazar Reporte
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                          ¿Eliminar publicación?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          La publicación será eliminada permanentemente.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={async () => {
+                                            await handleDeletePost(
+                                              report.reportedPostId
+                                            );
+                                            await handleResolveReport(
+                                              report.id,
+                                              'resolved'
+                                            );
+                                          }}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          Eliminar
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
+
+                                {/* Rechazar */}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleResolveReport(report.id, 'rejected')
+                                  }
+                                >
+                                  Rechazar Reporte
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -562,7 +618,9 @@ export function AdminPanel({ currentUserId, onUserClick }) {
 
             <CardContent>
               <div className="space-y-2">
-                {users.map((user) => (
+                {users
+                  .filter(user => userFilter === 'all' || (userFilter === 'suspended' && user.suspended))
+                  .map((user) => (
                   <Card key={user.id} className="border border-orange-200">
                     <CardContent className="flex items-center justify-between py-4">
                       <div className="flex items-center gap-3">
@@ -667,6 +725,82 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                   </Card>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* PUBLICACIONES */}
+        <TabsContent value="posts" className="space-y-4">
+          <Card className="border-2 border-orange-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-700">
+                <FileText className="h-5 w-5" />
+                Gestión de Publicaciones
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {posts.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No hay publicaciones</p>
+              ) : (
+                <div className="space-y-4">
+                  {posts.map((post) => (
+                    <Card key={post.id} className="border border-orange-200">
+                      <CardContent className="p-4">
+                        <div className="flex gap-4">
+                          {post.imageUrl && (
+                            <img 
+                              src={post.imageUrl} 
+                              alt="Post content" 
+                              className="h-24 w-24 object-cover rounded-md bg-gray-100"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium text-orange-900">{post.authorName || 'Usuario desconocido'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {post.createdAt?.toDate?.().toLocaleDateString() || 'Fecha desconocida'}
+                                </p>
+                              </div>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="destructive" className="h-8 bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Eliminar
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Eliminar publicación?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Esta acción no se puede deshacer.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      onClick={() => handleDeletePost(post.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                            <p className="mt-2 text-sm text-gray-600 line-clamp-2">{post.content}</p>
+                            <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
+                              <span>❤️ {post.likesCount || 0}</span>
+                              <span>💬 {post.commentsCount || 0}</span>
+                              <span>🔄 {post.sharesCount || 0}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

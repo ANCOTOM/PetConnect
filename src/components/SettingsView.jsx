@@ -133,9 +133,18 @@ export function SettingsView({ onAccountDeleted, onUserClick }) {
       await deleteDoc(doc(db, 'users', currentUser.uid));
       await deleteUser(currentUser);
       toast.success('Cuenta eliminada exitosamente');
-      setTimeout(() => onAccountDeleted(), 2000);
+      
+      setTimeout(() => {
+        if (onAccountDeleted) onAccountDeleted();
+        window.location.href = '/';
+      }, 2000);
     } catch (error) {
-      toast.error(error.message || 'Error al eliminar la cuenta');
+      console.error('Error deleting account:', error);
+      if (error.code === 'auth/requires-recent-login') {
+        toast.error('Por seguridad, cierra sesión y vuelve a entrar para eliminar tu cuenta');
+      } else {
+        toast.error(error.message || 'Error al eliminar la cuenta');
+      }
     }
   };
 

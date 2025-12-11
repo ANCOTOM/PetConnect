@@ -15,7 +15,8 @@ import { Toaster } from './components/ui/sonner';
 
 // Firebase imports
 import { auth, db } from './firebase/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { toast } from 'sonner';
 import { 
   collection, 
   query, 
@@ -54,8 +55,33 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        setUser(currentUser);
-        await loadProfile(currentUser.uid);
+        try {
+          // Verificar suspensión antes de dar acceso
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+
+          if (userDocSnap.exists() && userDocSnap.data().suspended) {
+            await signOut(auth);
+            setUser(null);
+            setProfile(null);
+            toast.error('CUENTA SUSPENDIDA: Tu cuenta ha sido suspendida por violar las normas.', {
+              duration: 10000,
+              action: {
+                label: 'Entendido',
+                onClick: () => console.log('Undo')
+              },
+            });
+          } else {
+            setUser(currentUser);
+            if (userDocSnap.exists()) {
+              setProfile({ id: userDocSnap.id, ...userDocSnap.data() });
+            }
+          }
+        } catch (error) {
+          console.error('Error checking suspension:', error);
+          setUser(currentUser);
+          await loadProfile(currentUser.uid);
+        }
       } else {
         setUser(null);
         setProfile(null);
