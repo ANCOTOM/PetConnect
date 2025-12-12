@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Send } from 'lucide-react';
 import { auth, db } from '../firebase/firebase';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDoc, doc, updateDoc, increment } from 'firebase/firestore';
-import { createNotification } from '../firebase/notifications';
+import { createNotification } from '../utils/notifications';
 
 
 export function CommentsDialog({ postId, onClose }) {
