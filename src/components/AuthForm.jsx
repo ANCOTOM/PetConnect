@@ -26,18 +26,19 @@ export function AuthForm({ onSuccess }) {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
 
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState({//Estado para el formulario de registro
     petType: ''
   });
   const [petTypeCustom, setPetTypeCustom] = useState('');
 
  
-  const handleSignUp = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const handleSignUp = async (e) => {//Función para manejar el registro de usuarios
+    e.preventDefault();//Prevenir el comportamiento por defecto del formulario
+    setIsLoading(true);//Indicar que se está procesando
     setError('');
 
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(e.currentTarget);//Obtener los datos del formulario
+    //Declara todas las variables y sus gets de los campos de la Base de datos
     const email = formData.get('email');
     const password = formData.get('password');
     const name = formData.get('name');
@@ -75,23 +76,23 @@ export function AuthForm({ onSuccess }) {
   };
 
   
-  const handleSignIn = async (e) => {
+  const handleSignIn = async (e) => {//funcion para manejar el inciio de sesión
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(e.currentTarget);//Obtener los datos del formulario
     const email = formData.get('email');
     const password = formData.get('password');
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);//Iniciar sesión con email y contraseña
       
       // Verificar si el usuario está suspendido
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       if (userDoc.exists() && userDoc.data().suspended) {
         await signOut(auth);
-        // El toast se maneja globalmente en App.jsx para evitar duplicados
+        // El toast se maneja globalmente en App.jsx para evitar duplicados(lo que avisa que esta suspendido)
         return;
       }
 
@@ -109,9 +110,10 @@ export function AuthForm({ onSuccess }) {
   };
 
  
-  const handleOAuthSignIn = async (providerName) => {
-    let provider;
+  const handleOAuthSignIn = async (providerName) => {//Funcion para manejar el OAuth
+    let provider;//Declarar variable provider
     switch (providerName) {
+      //una instancia para cada tipo de proveedor segun nombre 
       case 'google': provider = new GoogleAuthProvider(); break;
       case 'facebook': provider = new FacebookAuthProvider(); break;
       case 'github': provider = new GithubAuthProvider(); break;
@@ -119,8 +121,10 @@ export function AuthForm({ onSuccess }) {
     }
 
     try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      const result = await signInWithPopup(auth, provider);//un await que espera la respuesta para hacer la autenticación
+      const user = result.user;//Obtener el usuario del resultado
+
+      // Referencia al documento del usuario en Firestore
       const userRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -131,7 +135,7 @@ export function AuthForm({ onSuccess }) {
         return;
       }
 
-      if (!userSnap.exists()) {
+      if (!userSnap.exists()) {//Si no existe el usuario en Firebase, creamos un nuevo documento
         await setDoc(userRef, {
           name: user.displayName || user.email.split('@')[0],
           profilePicture: user.photoURL || "",
@@ -154,18 +158,18 @@ export function AuthForm({ onSuccess }) {
   };
 
  
-  const handleResetPassword = async () => {
-    if (!resetEmail) {
+  const handleResetPassword = async () => {//Funcion para manejar el reseteo de la contraseña
+    if (!resetEmail) {//Validar que el email no esté vacío
       toast.error('Por favor ingresa tu correo electrónico');
       return;
     }
 
     setIsLoading(true);
     try {
-      await sendPasswordResetEmail(auth, resetEmail);
+      await sendPasswordResetEmail(auth, resetEmail);//un await que espera la respuesta para enviar el correo de reseteo
       toast.success('Se ha enviado un correo de recuperación');
-      setShowResetDialog(false);
-      setResetEmail('');
+      setShowResetDialog(false);//Cerrar el diálogo
+      setResetEmail('');//Limpiar el campo de email
     } catch (err) {
       console.error('Reset password error:', err);
       toast.error('Error al enviar correo de recuperación');

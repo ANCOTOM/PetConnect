@@ -20,15 +20,15 @@ export function Header({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleSearch = (e) => {
+  const handleSearch = (e) => {// Maneja el envio del formulario de busqueda
     e.preventDefault();
-    if (searchQuery.trim()) {
-      onSearch(searchQuery.trim(), searchType);
-      setSearchQuery('');
+    if (searchQuery.trim()) {// Si la consulta de busqueda no esta vacia
+      onSearch(searchQuery.trim(), searchType);// Llamar a la funcion onSearch pasada como prop
+      setSearchQuery('');// Limpiar el campo de busqueda
     }
   };
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => location.pathname === path;// Verifica si la ruta actual coincide con la proporcionada
 
   return (
     <header className="sticky top-0 z-50 bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg">
@@ -44,7 +44,7 @@ export function Header({
           </div>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-md flex gap-2">
+          <form onSubmit={handleSearch} className="flex-1 max-w-md flex gap-2">{/*Aca se usa la funcion de handleSearch */}
             <Select value={searchType} onValueChange={(value) => setSearchType(value)}>
               <SelectTrigger className="w-32 bg-white/90 border-none">
                 <SelectValue />
