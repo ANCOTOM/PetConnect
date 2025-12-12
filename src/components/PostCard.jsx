@@ -9,7 +9,7 @@ import { toast } from 'sonner@2.0.3';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { db } from '../firebase/firebase';
 import { doc, getDoc, updateDoc, deleteDoc, collection, addDoc, getDocs, query, where, increment } from 'firebase/firestore';
-import { createNotification } from '../firebase/notifications';
+import { createNotification } from '../utils/notifications'
 
 export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagClick, onUserClick }) {
   const [isLiked, setIsLiked] = useState(false);
@@ -228,21 +228,40 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
               {post.author?.name.charAt(0) || 'U'}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-orange-700 cursor-pointer hover:underline" onClick={() => onUserClick?.(post.userId)}>
-                {post.author?.name || 'Usuario'}
+       <div className="flex-1">
+          <div className="flex items-center gap-2">
+            {/* Nombre clickeable */}
+            <span
+              className="text-orange-700 cursor-pointer hover:underline"
+              onClick={() => onUserClick?.(post.userId)}
+            >
+              {post.author?.name || 'Usuario'}
+            </span>
+
+            {/* Texto con el nombre de la mascota */}
+            {post.author?.petName && (
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                con {post.author.petName}
+
+                {/* Foto de la mascota justo después del nombre */}
+                {post.author?.petPicture && (
+                  <Avatar className="h-9 w-9 border-2 border-orange-300">
+                    <AvatarImage src={post.author.petPicture} alt={post.author.petName} />
+                    <AvatarFallback className="bg-orange-300 text-white">P</AvatarFallback>
+                  </Avatar>
+                )}
+
+                {/* Tipo de mascota */}
+                {post.author.petType && `(${post.author.petType})`}
               </span>
-              {post.author?.petName && (
-                <span className="text-sm text-muted-foreground">
-                  con {post.author.petName} {post.author.petType && `(${post.author.petType})`}
-                </span>
-              )}
-              {post.visibility === 'friends' && <Users className="h-3 w-3 text-muted-foreground" title="Solo amigos" />}
-              {post.visibility === 'public' && <Globe className="h-3 w-3 text-muted-foreground" title="Público" />}
-            </div>
-            <p className="text-xs text-muted-foreground">{formatDate(post.createdAt)}</p>
+            )}
+
+            {/* Iconos de visibilidad */}
+            {post.visibility === 'friends' && <Users className="h-3 w-3 text-muted-foreground" title="Solo amigos" />}
+            {post.visibility === 'public' && <Globe className="h-3 w-3 text-muted-foreground" title="Público" />}
           </div>
+        </div>
+
 
           {post.userId === currentUserId ? (
             <div className="flex gap-1">
