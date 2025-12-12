@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+// Importamos componentes para diálogos de alerta (confirmaciones)
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,7 @@ import {
 
 // Firebase imports
 import { db } from '../firebase/firebase';
+// Importamos funciones de Firestore para manejar colecciones y documentos
 import {
   collection,
   getDocs,
@@ -42,6 +44,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 
+// Definimos el componente AdminPanel que recibe el ID del usuario actual y una función para navegar al perfil de usuario
 export function AdminPanel({ currentUserId, onUserClick }) {
   const [stats, setStats] = useState(null);
   const [reports, setReports] = useState([]);
@@ -50,31 +53,43 @@ export function AdminPanel({ currentUserId, onUserClick }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const [selectedReport, setSelectedReport] = useState(null);
+  // Estado para controlar qué pestaña está activa (reportes, usuarios, posts)
   const [activeTab, setActiveTab] = useState('reports');
+  // Estado para filtrar reportes (todos, pendientes, etc.)
   const [reportFilter, setReportFilter] = useState('all');
+  // Estado para filtrar usuarios (todos, suspendidos)
   const [userFilter, setUserFilter] = useState('all');
 
+  // useEffect se ejecuta al montar el componente para cargar los datos iniciales
   useEffect(() => {
     loadAdminData();
   }, []);
 
+  // Función asíncrona para cargar todos los datos necesarios del panel
   const loadAdminData = async () => {
     try {
+      // Ejecutamos todas las cargas en paralelo usando Promise.all para mayor eficiencia
       await Promise.all([loadStats(), loadReports(), loadUsers(), loadAllPosts()]);
     } catch (error) {
+      // Manejo de errores si falla la carga
       console.error('Error loading admin data:', error);
     } finally {
+      // Desactivamos el estado de carga una vez finalizado (éxito o error)
       setIsLoading(false);
     }
   };
 
+  // Función para cargar todas las publicaciones de la base de datos
   const loadAllPosts = async () => {
     try {
+      // Consultamos la colección 'posts' ordenada por fecha de creación descendente
       const postsSnapshot = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc')));
+      // Mapeamos los documentos para incluir su ID y datos
       const postsData = postsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      // Actualizamos el estado de posts
       setPosts(postsData);
     } catch (error) {
       console.error('Error loading posts:', error);
@@ -82,22 +97,25 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función para calcular estadísticas generales del sistema
   const loadStats = async () => {
     try {
-      // Contar usuarios
+      // Obtener todos los usuarios para contarlos
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const totalUsers = usersSnapshot.size;
+      // Filtrar usuarios suspendidos
       const suspendedUsers = usersSnapshot.docs.filter(
         doc => doc.data().suspended === true
       ).length;
 
-      // Contar posts
+      // Obtener todos los posts para contarlos
       const postsSnapshot = await getDocs(collection(db, 'posts'));
       const totalPosts = postsSnapshot.size;
 
-      // Contar reportes
+      // Obtener todos los reportes
       const reportsSnapshot = await getDocs(collection(db, 'reports'));
       const totalReports = reportsSnapshot.size;
+      // Filtrar reportes pendientes (o sin estado definido)
       const pendingReports = reportsSnapshot.docs.filter(
         doc => {
           const data = doc.data();
@@ -105,6 +123,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
         }
       ).length;
 
+      // Actualizar el estado con los contadores calculados
       setStats({
         totalUsers,
         totalPosts,
@@ -118,33 +137,38 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función para cargar y procesar la lista de reportes
   const loadReports = async () => {
     try {
+      // Obtener todos los documentos de la colección 'reports'
       const reportsSnapshot = await getDocs(collection(db, 'reports'));
       const reportsData = [];
 
+      // Iterar sobre cada reporte para enriquecerlo con datos relacionados
       for (const reportDoc of reportsSnapshot.docs) {
         const reportData = { id: reportDoc.id, ...reportDoc.data() };
 
-        // Normalizar datos para reportes antiguos
+        // Normalizar datos para reportes antiguos que no tengan status o usen postId
         if (!reportData.status) reportData.status = 'pending';
         if (reportData.postId && !reportData.reportedPostId) {
           reportData.reportedPostId = reportData.postId;
         }
 
-        // Cargar info del reportador
+        // Cargar información del usuario que hizo el reporte (reporter)
         if (reportData.reporterId || reportData.reportedBy) {
           const reporterId = reportData.reporterId || reportData.reportedBy;
           const reporterDoc = await getDoc(doc(db, 'users', reporterId));
           reportData.reporter = reporterDoc.exists() ? reporterDoc.data() : null;
         }
 
-        // Cargar info del reportado
+        // Cargar información de la entidad reportada (usuario o post)
         if (reportData.reportedUserId) {
+          // Si es un reporte de usuario, cargar datos del usuario reportado
           const reportedDoc = await getDoc(doc(db, 'users', reportData.reportedUserId));
           reportData.reported = reportedDoc.exists() ? reportedDoc.data() : null;
           reportData.type = 'user';
         } else if (reportData.reportedPostId) {
+          // Si es un reporte de post, cargar datos del post reportado
           const postDoc = await getDoc(doc(db, 'posts', reportData.reportedPostId));
           reportData.reported = postDoc.exists() ? postDoc.data() : null;
           reportData.type = 'post';
@@ -153,13 +177,14 @@ export function AdminPanel({ currentUserId, onUserClick }) {
         reportsData.push(reportData);
       }
 
-      // Ordenar por fecha (más recientes primero)
+      // Ordenar los reportes por fecha (más recientes primero)
       reportsData.sort((a, b) => {
         const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt);
         const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt);
         return dateB - dateA;
       });
 
+      // Actualizar estado de reportes
       setReports(reportsData);
     } catch (error) {
       console.error('Error loading reports:', error);
@@ -167,21 +192,24 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función para cargar la lista de usuarios
   const loadUsers = async () => {
     try {
+      // Obtener todos los usuarios
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const usersData = usersSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
 
-      // Ordenar: admins primero, luego por nombre
+      // Ordenar usuarios: administradores primero, luego alfabéticamente por nombre
       usersData.sort((a, b) => {
         if (a.isAdmin && !b.isAdmin) return -1;
         if (!a.isAdmin && b.isAdmin) return 1;
         return (a.name || '').localeCompare(b.name || '');
       });
 
+      // Actualizar estado de usuarios
       setUsers(usersData);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -189,9 +217,12 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función para resolver un reporte (aceptar, rechazar, etc.)
   const handleResolveReport = async (reportId, status) => {
     try {
+      // Referencia al documento del reporte
       const reportRef = doc(db, 'reports', reportId);
+      // Actualizar el estado del reporte y añadir datos de resolución
       await updateDoc(reportRef, {
         status,
         resolvedAt: serverTimestamp(),
@@ -199,6 +230,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
       });
 
       toast.success('Reporte actualizado');
+      // Recargar datos para reflejar cambios
       loadReports();
       loadStats();
     } catch (error) {
@@ -207,15 +239,18 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función para suspender a un usuario
   const handleSuspendUser = async (userId) => {
     try {
       const userRef = doc(db, 'users', userId);
+      // Marcar el campo 'suspended' como true en el documento del usuario
       await updateDoc(userRef, {
         suspended: true,
         suspendedAt: serverTimestamp()
       });
 
       toast.success('Usuario suspendido');
+      // Recargar datos
       loadUsers();
       loadStats();
     } catch (error) {
@@ -224,9 +259,11 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función para quitar la suspensión a un usuario
   const handleUnsuspendUser = async (userId) => {
     try {
       const userRef = doc(db, 'users', userId);
+      // Marcar el campo 'suspended' como false
       await updateDoc(userRef, {
         suspended: false,
         unsuspendedAt: serverTimestamp()
@@ -241,12 +278,14 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función para eliminar una publicación
   const handleDeletePost = async (postId) => {
     try {
-      // Eliminar el post
+      // Eliminar el documento del post de la colección 'posts'
       await deleteDoc(doc(db, 'posts', postId));
 
       toast.success('Publicación eliminada');
+      // Recargar todas las listas afectadas
       loadReports();
       loadStats();
       loadAllPosts();
@@ -256,9 +295,11 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función para otorgar permisos de administrador a un usuario
   const handleMakeAdmin = async (userId) => {
     try {
       const userRef = doc(db, 'users', userId);
+      // Establecer isAdmin: true
       await updateDoc(userRef, {
         isAdmin: true,
         madeAdminAt: serverTimestamp()
@@ -272,10 +313,11 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     }
   };
 
+  // Función auxiliar para formatear fechas de Firestore o JS Date a string legible
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Fecha desconocida';
     
-    // Manejar tanto Timestamp de Firestore como strings
+    // Manejar tanto Timestamp de Firestore como strings o Date objects
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     
     return date.toLocaleDateString('es-ES', {
@@ -287,6 +329,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
     });
   };
 
+  // Renderizado condicional: Mostrar spinner de carga si isLoading es true
   if (isLoading) {
     return (
       <div className="text-center py-8">
@@ -298,13 +341,15 @@ export function AdminPanel({ currentUserId, onUserClick }) {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {/* Encabezado del Panel */}
       <div className="flex items-center gap-2">
         <Shield className="h-8 w-8 text-orange-600" />
         <h2 className="text-orange-700">Panel de Administración</h2>
       </div>
 
-      {/* Stats Cards */}
+      {/* Tarjetas de Estadísticas (Stats Cards) */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {/* Tarjeta: Total de Usuarios */}
         <Card 
           className={`border-2 border-blue-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'users' && userFilter === 'all' ? 'ring-2 ring-blue-400' : ''}`}
           onClick={() => {
@@ -323,6 +368,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </CardContent>
         </Card>
 
+        {/* Tarjeta: Total de Publicaciones */}
         <Card 
           className={`border-2 border-green-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'posts' ? 'ring-2 ring-green-400' : ''}`}
           onClick={() => setActiveTab('posts')}
@@ -338,6 +384,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </CardContent>
         </Card>
 
+        {/* Tarjeta: Total de Reportes */}
         <Card 
           className={`border-2 border-yellow-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'reports' && reportFilter === 'all' ? 'ring-2 ring-yellow-400' : ''}`}
           onClick={() => {
@@ -356,6 +403,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </CardContent>
         </Card>
 
+        {/* Tarjeta: Reportes Pendientes */}
         <Card 
           className={`border-2 border-red-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'reports' && reportFilter === 'pending' ? 'ring-2 ring-red-400' : ''}`}
           onClick={() => {
@@ -374,6 +422,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </CardContent>
         </Card>
 
+        {/* Tarjeta: Usuarios Suspendidos */}
         <Card 
           className={`border-2 border-purple-200 cursor-pointer transition-all hover:scale-105 ${activeTab === 'users' && userFilter === 'suspended' ? 'ring-2 ring-purple-400' : ''}`}
           onClick={() => {
@@ -393,6 +442,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
         </Card>
       </div>
 
+      {/* Sistema de Pestañas (Tabs) para navegar entre secciones */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="reports">Reportes</TabsTrigger>
@@ -400,7 +450,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           <TabsTrigger value="posts">Publicaciones</TabsTrigger>
         </TabsList>
 
-        {/* REPORTES */}
+        {/* --- CONTENIDO DE LA PESTAÑA: REPORTES --- */}
         <TabsContent value="reports" className="space-y-4">
           <Card className="border-2 border-orange-200">
             <CardHeader>
@@ -414,16 +464,19 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                 <p className="text-center text-muted-foreground py-8">No hay reportes</p>
               ) : (
                 <div className="space-y-4">
+                  {/* Mapeo y filtrado de reportes */}
                   {reports
                     .filter(report => reportFilter === 'all' || report.status === reportFilter)
                     .map((report) => (
                     <Card key={report.id} className="border border-orange-200">
                       <CardContent className="py-4">
+                        {/* Encabezado del reporte (clic para expandir) */}
                         <div 
                           className="flex items-center justify-between cursor-pointer"
                           onClick={() => setSelectedReport(selectedReport === report.id ? null : report.id)}
                         >
                           <div className="flex items-center gap-3">
+                            {/* Badge de estado del reporte */}
                             <Badge
                               variant={
                                 report.status === 'pending'
@@ -460,9 +513,10 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                           </div>
                         </div>
 
-                        {/* Contenido Expandible */}
+                        {/* Detalles Expandibles del Reporte */}
                         {selectedReport === report.id && (
                           <div className="mt-4 pt-4 border-t border-orange-100 space-y-4 animate-in fade-in slide-in-from-top-2">
+                            {/* Motivo del reporte */}
                             <div className="bg-orange-50 p-3 rounded-md">
                               <p className="text-sm font-medium text-orange-800 mb-1">
                                 Motivo del reporte:
@@ -472,6 +526,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                               </p>
                             </div>
 
+                            {/* Si es un reporte de POST, mostrar contenido del post */}
                             {report.type === 'post' && report.reported && (
                               <div className="bg-white border border-orange-100 p-3 rounded-md">
                                 <p className="text-xs text-muted-foreground mb-2">
@@ -488,6 +543,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                               </div>
                             )}
 
+                            {/* Si es un reporte de USUARIO, mostrar info del usuario */}
                             {report.type === 'user' && report.reported && (
                               <div className="flex items-center gap-3 bg-white border border-orange-100 p-3 rounded-md">
                                 <Avatar className="h-10 w-10">
@@ -501,9 +557,10 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                               </div>
                             )}
 
+                            {/* Botones de Acción (solo si está pendiente) */}
                             {report.status === 'pending' && (
                               <div className="flex gap-2 justify-end pt-2">
-                                {/* Acciones de resolución */}
+                                {/* Acción: Suspender Usuario (si es reporte de usuario) */}
                                 {report.type === 'user' && (
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
@@ -549,6 +606,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                                   </AlertDialog>
                                 )}
 
+                                {/* Acción: Eliminar Post (si es reporte de post) */}
                                 {report.type === 'post' && (
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
@@ -593,7 +651,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                                   </AlertDialog>
                                 )}
 
-                                {/* Rechazar */}
+                                {/* Acción: Rechazar Reporte (falso positivo) */}
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -616,7 +674,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </Card>
         </TabsContent>
 
-        {/* USUARIOS */}
+        {/* --- CONTENIDO DE LA PESTAÑA: USUARIOS --- */}
         <TabsContent value="users" className="space-y-4">
           <Card className="border-2 border-orange-200">
             <CardHeader>
@@ -628,6 +686,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
 
             <CardContent>
               <div className="space-y-2">
+                {/* Lista de usuarios filtrada */}
                 {users
                   .filter(user => userFilter === 'all' || (userFilter === 'suspended' && user.suspended))
                   .map((user) => (
@@ -658,6 +717,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                           </p>
                         </div>
 
+                        {/* Badges de estado del usuario */}
                         <div className="flex gap-1">
                           {user.isAdmin && (
                             <Badge variant="secondary">Admin</Badge>
@@ -671,6 +731,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                         </div>
                       </div>
 
+                      {/* Botones de acción por usuario */}
                       <div className="flex gap-2">
                         {!user.isAdmin && (
                           <Button
@@ -739,7 +800,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
           </Card>
         </TabsContent>
 
-        {/* PUBLICACIONES */}
+        {/* --- CONTENIDO DE LA PESTAÑA: PUBLICACIONES --- */}
         <TabsContent value="posts" className="space-y-4">
           <Card className="border-2 border-orange-200">
             <CardHeader>
@@ -753,6 +814,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                 <p className="text-center text-muted-foreground py-8">No hay publicaciones</p>
               ) : (
                 <div className="space-y-4">
+                  {/* Lista de todas las publicaciones */}
                   {posts.map((post) => (
                     <Card key={post.id} className="border border-orange-200">
                       <CardContent className="p-4">
@@ -772,6 +834,7 @@ export function AdminPanel({ currentUserId, onUserClick }) {
                                   {post.createdAt?.toDate?.().toLocaleDateString() || 'Fecha desconocida'}
                                 </p>
                               </div>
+                              {/* Botón para eliminar publicación directamente */}
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button size="sm" variant="destructive" className="h-8 bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
