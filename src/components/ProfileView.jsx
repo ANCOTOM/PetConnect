@@ -61,20 +61,20 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
     profilePicture: '',
   });
 
-  useEffect(() => {
+  useEffect(() => {// useEffect para cargar el perfil y las publicaciones cuando el componente se monta o cambia el userId
     loadProfile();
     loadPosts();
     if (!isOwnProfile) checkFollowStatus();
   }, [userId]);
 
   // Cargar perfil
-  const loadProfile = async () => {
+  const loadProfile = async () => {// funcion asincrona para cargar el perfil del usuario
     try {
-      const docRef = doc(db, 'users', userId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setProfile(data);
+      const docRef = doc(db, 'users', userId);// referencia al documento del usuario en la coleccion users
+      const docSnap = await getDoc(docRef);// obtener el documento
+      if (docSnap.exists()) {// si el documento existe
+        const data = docSnap.data();// obtener los datos del documento
+        setProfile(data);// setear el estado del perfil con los datos obtenidos
 
         // Stats
         const postsSnap = await getDocs(query(collection(db, 'posts'), where('userId', '==', userId)));
@@ -108,39 +108,40 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
   // Cargar posts
   const loadPosts = async () => {
     try {
-      const snapshot = await getDocs(query(collection(db, 'posts'), where('userId', '==', userId)));
-      const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const snapshot = await getDocs(query(collection(db, 'posts'), where('userId', '==', userId)));// consulta para obtener las publicaciones del usuario
+      const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));// mapeo de los documentos obtenidos
 
-      postsData.sort((a, b) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-        return dateB - dateA;
+      postsData.sort((a, b) => {// ordenar las publicaciones por fecha de creacion descendente
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);// convertir a objeto Date
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);// convertir a objeto Date
+        return dateB - dateA;// ordenar de mas reciente a mas antiguo
       });
 
-      if (currentUser) {
-        await Promise.all(postsData.map(async (post) => {
-          const likesRef = collection(db, 'posts', post.id, 'likes');
-          const likeSnap = await getDocs(query(likesRef, where('userId', '==', currentUser.uid)));
-          post.isLiked = !likeSnap.empty;
+      if (currentUser) {// verificar si hay un usuario autenticado
+        await Promise.all(postsData.map(async (post) => {// para cada publicacion, verificar si el usuario le dio like o share
+          const likesRef = collection(db, 'posts', post.id, 'likes');// referencia a la subcoleccion de likes
+          const likeSnap = await getDocs(query(likesRef, where('userId', '==', currentUser.uid)));// consulta para verificar si el usuario le dio like
+          post.isLiked = !likeSnap.empty;// setear isLiked segun el resultado de la consulta
 
+          //Lo mismo pero para shares o compartidos
           const sharesRef = collection(db, 'posts', post.id, 'shares');
           const shareSnap = await getDocs(query(sharesRef, where('userId', '==', currentUser.uid)));
           post.isShared = !shareSnap.empty;
         }));
       }
 
-      setPosts(postsData);
+      setPosts(postsData);// setea los posts con los datos obtenidos
     } catch (error) {
       console.error('Error loading posts:', error);
       toast.error('Error al cargar publicaciones');
     }
   };
 
-  // Check follow status
+  // Checkea el status del follow
   const checkFollowStatus = async () => {
     if (!currentUser) return;
     try {
-      const snapshot = await getDocs(query(
+      const snapshot = await getDocs(query(//query para verificar si el usuario actual sigue al usuario del perfil
         collection(db, 'follows'),
         where('followerId', '==', currentUser.uid),
         where('followingId', '==', userId)
@@ -152,31 +153,31 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
   };
 
   // Follow / Unfollow
-  const handleFollow = async () => {
+  const handleFollow = async () => {// Maneja el follow y unfollow de usuarios
     if (!currentUser) return;
     try {
-      if (isFollowing) {
-        const snapshot = await getDocs(query(
+      if (isFollowing) {// si ya esta siguiendo, hacer unfollow
+        const snapshot = await getDocs(query(//query para obtener el documento de follow
           collection(db, 'follows'),
           where('followerId', '==', currentUser.uid),
           where('followingId', '==', userId)
         ));
-        for (const docSnap of snapshot.docs) {
-          await deleteDoc(doc(db, 'follows', docSnap.id));
+        for (const docSnap of snapshot.docs) {// eliminar cada documento encontrado (deberia ser solo uno)
+          await deleteDoc(doc(db, 'follows', docSnap.id));// delete del documento en la bd
         }
-        setIsFollowing(false);
-        setStats(prev => ({ ...prev, followersCount: Math.max(prev.followersCount - 1, 0) }));
+        setIsFollowing(false);// actualizar el estado a no siguiendo
+        setStats(prev => ({ ...prev, followersCount: Math.max(prev.followersCount - 1, 0) }));// bajar el contador de seguidores en el estado
         toast.success('Dejaste de seguir');
-      } else {
-        await addDoc(collection(db, 'follows'), {
+      } else {//esta parte es cuando uno sigue a otro usuario
+        await addDoc(collection(db, 'follows'), {// agregar un nuevo documento de follow en la bd
           followerId: currentUser.uid,
           followingId: userId,
           createdAt: serverTimestamp()
         });
-        setIsFollowing(true);
-        setStats(prev => ({ ...prev, followersCount: prev.followersCount + 1 }));
+        setIsFollowing(true);//setea que ahora si lo sigue 
+        setStats(prev => ({ ...prev, followersCount: prev.followersCount + 1 }));// aumentar el contador de seguidores en el estado
         toast.success('Ahora sigues a este usuario');
-        await createNotification({
+        await createNotification({//ahí un await para crear la notificacion de follow en la bd
           toUserId: userId,
           type: 'follow',
           fromUserId: currentUser.uid,
@@ -193,16 +194,16 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
   const handleUploadProfilePicture = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setIsUploadingProfilePic(true);
+    setIsUploadingProfilePic(true);// poner el estado de subida en true
     try {
-      const url = await uploadToCloudinary(file, 'petconnect_profiles');
-      setEditForm(prev => ({ ...prev, profilePicture: url }));
+      const url = await uploadToCloudinary(file, 'petconnect_profiles');// subir la imagen a cloudinary y obtener la URL
+      setEditForm(prev => ({ ...prev, profilePicture: url }));// setear la URL de la imagen en el estado del formulario de edicion
       toast.success('Foto de perfil subida correctamente');
     } catch (err) {
       console.error(err);
       toast.error('Error al subir la foto de perfil');
     } finally {
-      setIsUploadingProfilePic(false);
+      setIsUploadingProfilePic(false);// poner el estado de subida en false
     }
   };
 
@@ -212,8 +213,8 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
     if (!file) return;
     setIsUploadingPetPic(true);
     try {
-      const url = await uploadToCloudinary(file, 'petconnect_profiles');
-      setEditForm(prev => ({ ...prev, petPicture: url }));
+      const url = await uploadToCloudinary(file, 'petconnect_profiles');// subir la imagen a cloudinary y obtener la URL
+      setEditForm(prev => ({ ...prev, petPicture: url }));// setear la URL de la imagen en el estado del formulario de edicion
       toast.success('Foto de mascota subida correctamente');
     } catch (err) {
       console.error(err);
@@ -224,11 +225,11 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
   };
 
   // Guardar perfil
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = async () => {// Maneja la actualizacion del perfil del usuario
     try {
-      const docRef = doc(db, 'users', userId);
-      await updateDoc(docRef, { ...editForm });
-      setProfile({ ...profile, ...editForm });
+      const docRef = doc(db, 'users', userId);// referencia al documento del usuario en la coleccion users
+      await updateDoc(docRef, { ...editForm });// actualizar el documento con los datos del formulario de edicion
+      setProfile({ ...profile, ...editForm });// actualizar el estado del perfil con los nuevos datos, por eso es un set
       setIsEditing(false);
       toast.success('Perfil actualizado correctamente');
     } catch (error) {
@@ -239,12 +240,12 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
 
   // Reportar usuario
   const handleReportUser = async () => {
-    if (!reportReason.trim()) {
+    if (!reportReason.trim()) {//que no este vacio
       toast.error('Por favor describe el motivo del reporte');
       return;
     }
     try {
-      await addDoc(collection(db, 'reports'), {
+      await addDoc(collection(db, 'reports'), {// agregar un nuevo reporte en la coleccion reports
         reporterId: currentUser.uid,
         reportedUserId: userId,
         reason: reportReason,

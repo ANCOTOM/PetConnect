@@ -9,43 +9,43 @@ export function NotificationsView({ user, onNotificationClick }) {
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  useEffect(() => {// useEffect para cargar las notificaciones en el momento
     if (!user) return;
-    const userId = user.uid;
+    const userId = user.uid;// obtener el ID del usuario actual
 
-    const q = query(
+    const q = query(// consulta para obtener las notificaciones de la BD
       collection(db, 'notifications'),
       where('toUserId', '==', userId),
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setNotifications(notifs);
+    const unsubscribe = onSnapshot(q, (snapshot) => {// Escuchar cambios en tiempo real
+      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));// mapeo de los documentos obtenidos
+      setNotifications(notifs);// setea el estado de las notificaciones como las recibidas
       setIsLoading(false);
     }, (error) => {
       console.error('Error loading notifications:', error);
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [user]);
+    return () => unsubscribe();// limpiar la suscripcion al desmontar
+  }, [user]);// el efecto se vuelve a ejecutar si cambia el usuario
 
-  const markAsRead = async (notificationId) => {
+  const markAsRead = async (notificationId) => {//marcar una noti como leida en la BD
     try {
-      const notifRef = doc(db, 'notifications', notificationId);
-      await updateDoc(notifRef, { read: true });
+      const notifRef = doc(db, 'notifications', notificationId);// referencia al documento de la notificacion
+      await updateDoc(notifRef, { read: true });//update en la BD
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
   };
 
-  const handleNotificationClick = async (notification) => {
-    if (!notification.read) await markAsRead(notification.id);
+  const handleNotificationClick = async (notification) => {// Maneja el click en una notificacion
+    if (!notification.read) await markAsRead(notification.id);// marcar como leida si no lo esta con la funcion de arriba
     onNotificationClick?.(notification);
   };
 
-  const getIcon = (type) => {
+  const getIcon = (type) => {// Obtener el icono segun el tipo de notificacion con las librerias
     switch (type) {
       case 'like': return <Heart className="h-5 w-5 text-red-500 fill-current" />;
       case 'comment': return <MessageCircle className="h-5 w-5 text-blue-500" />;
@@ -55,7 +55,7 @@ export function NotificationsView({ user, onNotificationClick }) {
     }
   };
 
-  const getText = (n) => {
+  const getText = (n) => {// Obtener el texto de la notificacion segun su tipo por medio del nombre del usuario que la genero
     const name = n.fromUserName || 'Alguien';
     switch (n.type) {
       case 'like': return `${name} le dio me gusta a tu publicación`;
@@ -66,10 +66,11 @@ export function NotificationsView({ user, onNotificationClick }) {
     }
   };
 
-  const formatDate = (date) => {
-    if (!date) return '';
-    const d = date.toDate ? date.toDate() : new Date(date);
-    const now = new Date();
+  const formatDate = (date) => {// Formatear la fecha de la notificacion a un formato legible
+    if (!date) return '';//si no hay fecha, pued cadena vacia o sea sin nada
+    const d = date.toDate ? date.toDate() : new Date(date);// convertir a objeto Date
+    const now = new Date();// fecha actual
+    //a partir de la fecha actual, calcular la diferencia y devolver un string segun la diferencia
     const diffMins = Math.floor((now - d) / 60000);
     if (diffMins < 1) return 'Ahora';
     if (diffMins < 60) return `Hace ${diffMins}m`;
@@ -80,7 +81,7 @@ export function NotificationsView({ user, onNotificationClick }) {
     return d.toLocaleDateString();
   };
 
-  if (isLoading) return <div className="text-center py-8">Cargando notificaciones...</div>;
+  if (isLoading) return <div className="text-center py-8">Cargando notificaciones...</div>;//ahi por mientras carga
 
   return (
     <div className="max-w-2xl mx-auto space-y-2">

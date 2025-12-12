@@ -14,20 +14,20 @@ export function CommentsDialog({ postId, onClose }) {
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!postId) return;
+  useEffect(() => {// useEffect para cargar los comentarios en el momento 
+    if (!postId) return;// si no hay post, no hacer nada
 
-    const q = query(
+    const q = query(//Query para obtener los comentarios de la BD
       collection(db, 'posts', postId, 'comments'),
-      orderBy('createdAt', 'asc')
+      orderBy('createdAt', 'asc')// ordenar por fecha de creacion ascendente
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedComments = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+    const unsubscribe = onSnapshot(q, (snapshot) => {// Escuchar cambios en tiempo real
+      const fetchedComments = snapshot.docs.map(doc => ({// mapeo de los documentos obtenidos
+        id: doc.id,// id del comentario
+        ...doc.data()// resto de datos del comentario
       }));
-      setComments(fetchedComments);
+      setComments(fetchedComments);// setea el estado de los comentarios como los recibidos
     }, (error) => {
       console.error('Error loading comments:', error);
     });
@@ -35,18 +35,19 @@ export function CommentsDialog({ postId, onClose }) {
     return () => unsubscribe();
   }, [postId]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {//handle de nuevos comentarios en las publicaciones
   e.preventDefault();
-  if (!newComment.trim() || !auth.currentUser) return;
+  if (!newComment.trim() || !auth.currentUser) return;// Validar que el comentario no esté vacío y que el usuario esté autenticado
 
   setIsSubmitting(true);
   try {
     //  desde Firestore
-    const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-    const userName = userDoc.exists() ? userDoc.data().name : 'Usuario';
-    const userPhoto = userDoc.exists() ? userDoc.data().profilePicture : '';
+    const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));// Obtener datos del usuario actual
+    const userName = userDoc.exists() ? userDoc.data().name : 'Usuario';// nombre de usuario
+    const userPhoto = userDoc.exists() ? userDoc.data().profilePicture : '';// foto de perfil
 
     //  comentario
+    // añade el doc a firebase, digamos como hacer un post o un INSERT si fuera SQL
     await addDoc(collection(db, 'posts', postId, 'comments'), {
       content: newComment.trim(),
       authorId: auth.currentUser.uid,
@@ -55,7 +56,7 @@ export function CommentsDialog({ postId, onClose }) {
       createdAt: serverTimestamp()
     });
 
-    // INCREMENTAR CONTADOR DE 
+    // INCREMENTAR CONTADOR DE COMENTARIOS
     const postRef = doc(db, 'posts', postId);
     await updateDoc(postRef, {
       commentsCount: increment(1)
@@ -63,10 +64,10 @@ export function CommentsDialog({ postId, onClose }) {
 
     
     // Notificacion 
-    const postDoc = await getDoc(postRef);
-    const postAuthorId = postDoc.exists() ? postDoc.data().userId : null;
-    if (postAuthorId && postAuthorId !== auth.currentUser.uid) { 
-      await createNotification({
+    const postDoc = await getDoc(postRef);// Obtener el documento de la publicación comentada
+    const postAuthorId = postDoc.exists() ? postDoc.data().userId : null;// ID del autor de la publicación
+    if (postAuthorId && postAuthorId !== auth.currentUser.uid) { // Evitar notificarse a uno mismo
+      await createNotification({// Crear una notificación para el autor de la publicación
         toUserId: postAuthorId,
         type: 'comment',
         fromUserId: auth.currentUser.uid,
@@ -74,25 +75,25 @@ export function CommentsDialog({ postId, onClose }) {
         postId: postId
       });
     }
-    setNewComment('');
+    setNewComment('');// Limpiar el campo del nuevo comentario
   } catch (error) {
     console.error('Error creating comment:', error);
   } finally {
-    setIsSubmitting(false);
+    setIsSubmitting(false);// Siempre desactivar el estado de envío
   }
 };
-  const formatDate = (timestamp) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate();
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
+  const formatDate = (timestamp) => {// Formatear la fecha del comentario
+    if (!timestamp) return '';// Si no hay timestamp, retornar cadena vacía
+    const date = timestamp.toDate();// convertir el timestamp a objeto Date
+    const now = new Date();// obtener la fecha actual
+    const diffMs = now.getTime() - date.getTime();// diferencia en milisegundos
+    const diffMins = Math.floor(diffMs / 60000);// diferencia en minutos
+    const diffHours = Math.floor(diffMs / 3600000);// diferencia en horas
 
-    if (diffMins < 1) return 'Ahora';
-    if (diffMins < 60) return `Hace ${diffMins}m`;
-    if (diffHours < 24) return `Hace ${diffHours}h`;
-    return date.toLocaleDateString();
+    if (diffMins < 1) return 'Ahora';// menos de un minuto
+    if (diffMins < 60) return `Hace ${diffMins}m`;// menos de una hora
+    if (diffHours < 24) return `Hace ${diffHours}h`;// menos de un día
+    return date.toLocaleDateString();// más de un día, mostrar fecha completa
   };
 
   return (
