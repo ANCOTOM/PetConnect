@@ -134,7 +134,7 @@ export default function App() {
           postData.author = authorDoc.exists() ? authorDoc.data() : null;
         }
 
-        // Verificar si el usuario actual le dio like
+      
         const likesQuery = query(
           collection(db, 'posts', docSnap.id, 'likes'),
           where('userId', '==', user.uid)
@@ -142,7 +142,7 @@ export default function App() {
         const likesSnapshot = await getDocs(likesQuery);
         postData.isLiked = !likesSnapshot.empty;
 
-        // Verificar si el usuario actual compartió
+     
         const sharesQuery = query(
           collection(db, 'posts', docSnap.id, 'shares'),
           where('userId', '==', user.uid)
@@ -164,7 +164,7 @@ export default function App() {
 
     try {
       if (type === 'users') {
-        // Buscar usuarios por nombre
+       
         const usersSnapshot = await getDocs(collection(db, 'users'));
         const results = usersSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))

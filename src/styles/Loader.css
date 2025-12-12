@@ -10,11 +10,11 @@
 
 
 .cargando-texto {
-  position: relative; /* relativo al contenedor principal */
-  z-index: 10;        /* para que quede encima del GIF */
-  margin-top: 200px;  /* ajusta este valor hasta donde quieras */
+  position: relative; 
+  z-index: 10;        
+  margin-top: 200px;  
   text-align: center;
-  color: #ea580c;     /* text-orange-700 de Tailwind */
-  font-size: 1.25rem; /* text-xl */
+  color: #ea580c;     
+  font-size: 1.25rem; 
   font-weight: 600;  
 }

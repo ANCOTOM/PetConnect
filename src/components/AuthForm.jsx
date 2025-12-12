@@ -193,7 +193,7 @@ export function AuthForm({ onSuccess }) {
               <TabsTrigger value="signup">Registrarse</TabsTrigger>
             </TabsList>
 
-            {/* ---------------- SIGN IN ---------------- */}
+            
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
@@ -294,8 +294,6 @@ export function AuthForm({ onSuccess }) {
           </Tabs>
         </CardContent>
       </Card>
-
-  
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <DialogContent>
           <DialogHeader>
