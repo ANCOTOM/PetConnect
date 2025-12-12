@@ -115,6 +115,13 @@ export default function App() {
     if (!user) return;
 
     try {
+      // 1. Obtener lista de seguidos para filtrar privacidad
+      const followsQuery = query(
+        collection(db, 'follows'),
+        where('followerId', '==', user.uid)
+      );
+      const followsSnapshot = await getDocs(followsQuery);
+      const followingIds = followsSnapshot.docs.map(doc => doc.data().followingId);
     
       const postsQuery = query(
         collection(db, 'posts'),
@@ -127,6 +134,16 @@ export default function App() {
 
       for (const docSnap of snapshot.docs) {
         const postData = { id: docSnap.id, ...docSnap.data() };
+
+        // FILTRO DE PRIVACIDAD
+        // Si es público: mostrar
+        // Si es amigos: mostrar solo si soy el autor O sigo al autor
+        const isMyPost = postData.userId === user.uid;
+        const isFollowingAuthor = followingIds.includes(postData.userId);
+        
+        if (postData.visibility === 'friends' && !isMyPost && !isFollowingAuthor) {
+          continue; // No mostrar este post
+        }
 
        
         if (postData.userId) {
