@@ -28,47 +28,47 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
   useEffect(() => {
     const fetchLikesShares = async () => {
       try {
-        const likesSnapshot = await getDocs(collection(db, 'posts', post.id, 'likes'));
-        const sharesSnapshot = await getDocs(collection(db, 'posts', post.id, 'shares'));
+        const likesSnapshot = await getDocs(collection(db, 'posts', post.id, 'likes'));// obtener los likes de la publicacion
+        const sharesSnapshot = await getDocs(collection(db, 'posts', post.id, 'shares'));// obtener los shares de la publicacion
 
-        setLikesCount(likesSnapshot.size);
-        setSharesCount(sharesSnapshot.size);
+        setLikesCount(likesSnapshot.size);// establecer el conteo de likes por la cantidad de documentos obtenidos
+        setSharesCount(sharesSnapshot.size);// establecer el conteo de shares por la cantidad de documentos obtenidos
 
-        setIsLiked(likesSnapshot.docs.some(doc => doc.data().userId === currentUserId));
-        setIsShared(sharesSnapshot.docs.some(doc => doc.data().userId === currentUserId));
+        setIsLiked(likesSnapshot.docs.some(doc => doc.data().userId === currentUserId));// verificar si el usuario actual ha dado like
+        setIsShared(sharesSnapshot.docs.some(doc => doc.data().userId === currentUserId));// verificar si el usuario actual ha compartido
       } catch (error) {
         console.error('Error fetching likes/shares:', error);
       }
     };
-    fetchLikesShares();
-  }, [post.id, currentUserId]);
+    fetchLikesShares();// llamar a la funcion de fetchLikesShares
+  }, [post.id, currentUserId]);// el efecto se vuelve a ejecutar si cambia el ID del post o el ID del usuario actual
 
-  const handleLike = async () => {
+  const handleLike = async () => {// Maneja los likes en las publicaciones
     try {
-      const likesRef = collection(db, 'posts', post.id, 'likes');
+      const likesRef = collection(db, 'posts', post.id, 'likes');// referencia a la coleccion de likes de la publicacion
 
-      if (isLiked) {
-        const likeDocs = await getDocs(query(likesRef, where('userId', '==', currentUserId)));
-        for (let docSnap of likeDocs.docs) {
-          await deleteDoc(doc(db, 'posts', post.id, 'likes', docSnap.id));
+      if (isLiked) {// si ya esta likeado
+        const likeDocs = await getDocs(query(likesRef, where('userId', '==', currentUserId)));// obtener los documentos de like del usuario actual
+        for (let docSnap of likeDocs.docs) {// iterar sobre los documentos obtenidos
+          await deleteDoc(doc(db, 'posts', post.id, 'likes', docSnap.id));// eliminar cada documento de like
         }
-        await updateDoc(postRef, { likesCount: increment(-1) });
-        setIsLiked(false);
-        setLikesCount(prev => Math.max(prev - 1, 0));
+        await updateDoc(postRef, { likesCount: increment(-1) });// decrementar el contador de likes en la publicacion
+        setIsLiked(false);// actualizar el estado de isLiked para digamos si se quita el like
+        setLikesCount(prev => Math.max(prev - 1, 0));// decrementar el contador de likes en el estado
         toast.success('Ya no te gusta la publicación');
       } else {
-        await addDoc(likesRef, { userId: currentUserId, createdAt: new Date() });
-        await updateDoc(postRef, { likesCount: increment(1) });
-        setIsLiked(true);
-        setLikesCount(prev => prev + 1);
+        await addDoc(likesRef, { userId: currentUserId, createdAt: new Date() });// agregar un nuevo documento de like para el usuario actual en caso de que sea like
+        await updateDoc(postRef, { likesCount: increment(1) });// incrementar el contador de likes en la publicacion
+        setIsLiked(true);// actualizar el estado de isLiked para decir que le di like
+        setLikesCount(prev => prev + 1);// incrementar el contador de likes en el estado
         toast.success('Te gusta la publicación');
 
-        if (post.userId !== currentUserId) {
+        if (post.userId !== currentUserId) {// crear notificacion solo si no es el mismo usuario
           try {
-            const userDoc = await getDoc(doc(db, 'users', currentUserId));
-            const fromUserName = userDoc.exists() ? userDoc.data().name : 'Usuario';
+            const userDoc = await getDoc(doc(db, 'users', currentUserId));// Obtener el documento del usuario actual
+            const fromUserName = userDoc.exists() ? userDoc.data().name : 'Usuario';// nombre del usuario actual
 
-            await createNotification({
+            await createNotification({// crear la notificacion de like
               toUserId: post.userId,
               type: 'like',
               fromUserId: currentUserId,
@@ -86,32 +86,32 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
     }
   };
 
-  const handleShare = async () => {
+  const handleShare = async () => {// se encarga de manejar los compartidos de las publicaciones
     try {
       const sharesRef = collection(db, 'posts', post.id, 'shares');
 
-      if (isShared) {
-        const shareDocs = await getDocs(query(sharesRef, where('userId', '==', currentUserId)));
-        for (let docSnap of shareDocs.docs) {
-          await deleteDoc(doc(db, 'posts', post.id, 'shares', docSnap.id));
+      if (isShared) {// si ya esta compartido
+        const shareDocs = await getDocs(query(sharesRef, where('userId', '==', currentUserId)));// obtener los documentos de share del usuario actual
+        for (let docSnap of shareDocs.docs) {// iterar sobre los documentos obtenidos
+          await deleteDoc(doc(db, 'posts', post.id, 'shares', docSnap.id));// eliminar cada documento de share
         }
-        await updateDoc(postRef, { sharesCount: increment(-1) });
-        setIsShared(false);
-        setSharesCount(prev => Math.max(prev - 1, 0));
+        await updateDoc(postRef, { sharesCount: increment(-1) });// bajar el contador de shares en la publicacion
+        setIsShared(false);// actualizar el estado de isShared para decir que ya no esta compartido
+        setSharesCount(prev => Math.max(prev - 1, 0));// bajar el contador de shares en el estado
         toast.success('Dejaste de compartir la publicación');
-      } else {
-        await addDoc(sharesRef, { userId: currentUserId, createdAt: new Date() });
-        await updateDoc(postRef, { sharesCount: increment(1) });
-        setIsShared(true);
-        setSharesCount(prev => prev + 1);
+      } else {//ahora si, al compartir
+        await addDoc(sharesRef, { userId: currentUserId, createdAt: new Date() });// agregar un nuevo documento de share para el usuario actual
+        await updateDoc(postRef, { sharesCount: increment(1) });// incrementar el contador de shares en la publicacion
+        setIsShared(true);//ahora si esta compartido
+        setSharesCount(prev => prev + 1);//aumenta en el contador de shares en el estado
         toast.success('Publicación compartida');
 
-        if (post.userId !== currentUserId) {
+        if (post.userId !== currentUserId) {// crear notificacion solo si no es el mismo usuario
           try {
-            const userDoc = await getDoc(doc(db, 'users', currentUserId));
-            const fromUserName = userDoc.exists() ? userDoc.data().name : 'Usuario';
+            const userDoc = await getDoc(doc(db, 'users', currentUserId));// Obtener el documento del usuario actual
+            const fromUserName = userDoc.exists() ? userDoc.data().name : 'Usuario';//obtener el nombre
 
-            await createNotification({
+            await createNotification({// crear la notificacion de share en bd
               toUserId: post.userId,
               type: 'share',
               fromUserId: currentUserId,
@@ -129,26 +129,26 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
     }
   };
 
-  const handleEdit = async () => {
+  const handleEdit = async () => {// Maneja la edicion de las publicaciones
     try {
-      await updateDoc(postRef, { content: editContent });
-      post.content = editContent;
-      setIsEditing(false);
+      await updateDoc(postRef, { content: editContent });// actualizar el contenido de la publicacion en la bd
+      post.content = editContent;// actualizar el contenido del post localmente
+      setIsEditing(false);// cerrar el dialogo de edicion
       toast.success('Publicación actualizada');
-      onDelete?.();
+      onDelete?.();// llamar a la funcion onDelete para refrescar la lista de publicaciones
     } catch (error) {
       console.error('Error al editar:', error);
       toast.error('Error al editar');
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('¿Estás seguro de eliminar esta publicación?')) return;
-    setIsDeleting(true);
+  const handleDelete = async () => {// Maneja la eliminacion de las publicaciones
+    if (!confirm('¿Estás seguro de eliminar esta publicación?')) return;//confirmacion
+    setIsDeleting(true);// poner el estado de eliminacion en true
     try {
-      await deleteDoc(postRef);
+      await deleteDoc(postRef);// eliminar el documento de la publicacion en la bd
       toast.success('Publicación eliminada');
-      onDelete?.();
+      onDelete?.();// llamar a la funcion onDelete para refrescar la lista de publicaciones
     } catch (error) {
       console.error('Error al eliminar:', error);
       toast.error('Error al eliminar');
@@ -157,18 +157,18 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
     }
   };
 
-  const handleReportPost = async () => {
-    if (!reportReason.trim()) {
+  const handleReportPost = async () => {// Maneja el reporte de publicaciones
+    if (!reportReason.trim()) {//verifica que no este vacio
       toast.error('Describe el motivo del reporte');
       return;
     }
     try {
-      await addDoc(collection(db, 'reports'), {
-        reportedPostId: post.id,
-        reason: reportReason,
-        reportedBy: currentUserId,
-        status: 'pending',
-        createdAt: new Date()
+      await addDoc(collection(db, 'reports'), {// agregar un nuevo reporte en la coleccion reports
+        reportedPostId: post.id,// ID de la publicacion reportada
+        reason: reportReason,// motivo del reporte
+        reportedBy: currentUserId,// ID del usuario que reporta
+        status: 'pending',// estado del reporte
+        createdAt: new Date()// fecha de creacion
       });
       toast.success('Publicación reportada correctamente');
       setReportReason('');
@@ -179,7 +179,7 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
     }
   };
 
-  const formatDate = (timestamp) => {
+  const formatDate = (timestamp) => {//funcion como las de otros componentes para hacer un objeto de fecha y calcular dependiendo de cuanto haya pasado el mensaje
     if (!timestamp) return 'Ahora';
     let date;
     if (timestamp.toDate) date = timestamp.toDate();
@@ -196,13 +196,13 @@ export function PostCard({ post, currentUserId, onDelete, onComment, onHashtagCl
     return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const renderContentWithHashtags = (content) => {
-    if (!content) return null;
-    const parts = content.split(/(#[\w\u00C0-\u017F]+)/g);
+  const renderContentWithHashtags = (content) => {// Renderiza el contenido del post con hashtags clickeables
+    if (!content) return null;// si no hay contenido, retornar null
+    const parts = content.split(/(#[\w\u00C0-\u017F]+)/g);// dividir el contenido en partes, separando los hashtags
     return (
       <p className="mb-3 whitespace-pre-wrap">
-        {parts.map((part, index) =>
-          part.startsWith('#') ? (
+        {parts.map((part, index) =>// mapear cada parte
+          part.startsWith('#') ? (// si la parte es un hashtag
             <span
               key={index}
               className="text-orange-600 hover:text-orange-700 cursor-pointer hover:underline font-medium"

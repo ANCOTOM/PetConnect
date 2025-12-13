@@ -22,15 +22,15 @@ export function CreatePostForm({ userName, userProfilePicture, onPostCreated }) 
   const [isUploading, setIsUploading] = useState(false);
 
   
-const handleUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+const handleUpload = async (e) => {// Maneja la subida de imagenes a Cloudinary
+  const file = e.target.files[0];// obtener el primer archivo seleccionado
+  if (!file) return;//si no hay archivo, no va a devolver nada
 
-  setIsUploading(true);
+  setIsUploading(true);// ahora si, pasamos a estado de subida
 
   try {
-    const url = await uploadToCloudinary(file, "petconnect_posts");
-    setImageUrl(url);
+    const url = await uploadToCloudinary(file, "petconnect_posts");//lo que hacemos aca es subir la imagen a cloudinary y obtener la URL
+    setImageUrl(url);// setear la URL de la imagen en el estado directamente para mostrarla en el post
     toast.success("Imagen subida correctamente");
   } catch (err) {
     console.error(err);
@@ -40,25 +40,25 @@ const handleUpload = async (e) => {
   }
 };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {// Maneja la creacion de nuevas publicaciones
+    e.preventDefault();// prevenir el comportamiento por defecto del form
 
-    if (!content.trim() && !imageUrl && !videoUrl) {
+    if (!content.trim() && !imageUrl && !videoUrl) {// Validar que haya contenido, imagen o video para que no este vacio 
       toast.error('Agrega contenido, una imagen o un video');
       return;
     }
 
-    const auth = getAuth();
-    const currentUser = auth.currentUser;
+    const auth = getAuth();// obtener la instancia de autenticacion
+    const currentUser = auth.currentUser;// obtener el usuario actual
 
-    if (!currentUser) {
+    if (!currentUser) {//si no hay current user, pues no se puede publicar 
       toast.error('Debes iniciar sesión para publicar');
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSubmitting(true);// poner el estado de envio en true
     try {
-      await addDoc(collection(db, 'posts'), {
+      await addDoc(collection(db, 'posts'), {//el insert en la bd
         content: content.trim(),
         imageUrl: imageUrl || null,
         videoUrl: videoUrl || null,
