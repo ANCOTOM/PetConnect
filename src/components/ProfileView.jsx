@@ -48,6 +48,10 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
   const [isUploadingProfilePic, setIsUploadingProfilePic] = useState(false);
   const [isUploadingPetPic, setIsUploadingPetPic] = useState(false);
 
+  const [listType, setListType] = useState(null); // 'followers' | 'following'
+  const [listUsers, setListUsers] = useState([]);
+  const [isListOpen, setIsListOpen] = useState(false);
+
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
@@ -195,7 +199,7 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
     if (!file) return;
     setIsUploadingProfilePic(true);
     try {
-      const url = await uploadToCloudinary(file, 'petconnect_profiles');
+      const url = await uploadToCloudinary(file, 'petconnect_posts');
       setEditForm(prev => ({ ...prev, profilePicture: url }));
       toast.success('Foto de perfil subida correctamente');
     } catch (err) {
@@ -212,7 +216,7 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
     if (!file) return;
     setIsUploadingPetPic(true);
     try {
-      const url = await uploadToCloudinary(file, 'petconnect_profiles');
+      const url = await uploadToCloudinary(file, 'petconnect_posts');
       setEditForm(prev => ({ ...prev, petPicture: url }));
       toast.success('Foto de mascota subida correctamente');
     } catch (err) {
@@ -261,6 +265,35 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
     }
   };
 
+  // Abrir lista de seguidores / siguiendo
+  const openList = async (type) => {
+    setListType(type);
+    setIsListOpen(true);
+
+    try {
+      let userIds = [];
+      if (type === 'followers') {
+        const snap = await getDocs(query(collection(db, 'follows'), where('followingId', '==', userId)));
+        userIds = snap.docs.map(doc => doc.data().followerId);
+      } else if (type === 'following') {
+        const snap = await getDocs(query(collection(db, 'follows'), where('followerId', '==', userId)));
+        userIds = snap.docs.map(doc => doc.data().followingId);
+      }
+
+      const usersData = await Promise.all(
+        userIds.map(async id => {
+          const docSnap = await getDoc(doc(db, 'users', id));
+          return { id, ...docSnap.data() };
+        })
+      );
+
+      setListUsers(usersData);
+    } catch (err) {
+      console.error('Error fetching list:', err);
+      toast.error('Error al cargar la lista');
+    }
+  };
+
   if (isLoading) return <div className="text-center py-8">Cargando perfil...</div>;
   if (!profile) return <div className="text-center py-8">Perfil no encontrado</div>;
 
@@ -283,7 +316,6 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
 
             {/* Nombre, bio y mascota */}
             <div className="flex-1 flex justify-between items-center">
-              {/* Nombre y bio */}
               <div>
                 <h2 className="text-2xl font-bold text-orange-700">{profile.name}</h2>
                 {profile.bio && <p className="mt-1 text-muted-foreground">{profile.bio}</p>}
@@ -294,7 +326,6 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
                 )}
               </div>
 
-              {/* Mascota */}
               {profile.petName && profile.petPicture && (
                 <div className="flex flex-col items-center ml-6">
                   <p className="text-lg text-muted-foreground flex items-center gap-2">
@@ -309,46 +340,47 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
               )}
             </div>
           </div>
-              {/* Botones y Stats */}
-              <div className="mt-4 flex items-center justify-between">
-                {/* Stats */}
-                <div className="flex gap-6">
-                  <div className="text-center">
-                    <p className="font-bold text-orange-700">{stats.postsCount}</p>
-                    <p className="text-sm text-muted-foreground">Publicaciones</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold text-orange-700">{stats.followersCount}</p>
-                    <p className="text-sm text-muted-foreground">Seguidores</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold text-orange-700">{stats.followingCount}</p>
-                    <p className="text-sm text-muted-foreground">Siguiendo</p>
-                  </div>
-                </div>
 
-                {/* Botones */}
-                <div className="flex gap-2">
-                  {isOwnProfile ? (
-                    <Button onClick={() => setIsEditing(!isEditing)} className="bg-gradient-to-r from-orange-500 to-amber-500 ml">
-                      <Edit2 className="h-4 w-4 ml-2" />
-                      {isEditing ? 'Cancelar' : 'Editar Perfil'}
-                    </Button>
-                  ) : (
-                    <>
-                      <Button
-                        onClick={handleFollow}
-                        className={isFollowing ? "bg-gray-500 hover:bg-gray-600" : "bg-gradient-to-r from-orange-500 to-amber-500"}
-                      >
-                        {isFollowing ? <><UserMinus className="h-4 w-4 mr-2" />Dejar de seguir</> : <><UserPlus className="h-4 w-4 mr-2" />Seguir</>}
-                      </Button>
-                      <Button variant="outline" onClick={() => setShowReportDialog(true)} className="border-red-300 text-red-700">
-                        <Flag className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
+          <div className="mt-4 flex items-center">
+              {/* Stats: publicaciones, seguidores, siguiendo */}
+              <div className="flex gap-6 flex-1">
+                <div className="text-center cursor-pointer" onClick={() => openList('posts')}>
+                  <p className="font-bold text-orange-700">{stats.postsCount}</p>
+                  <p className="text-sm text-muted-foreground">Publicaciones</p>
+                </div>
+                <div className="text-center cursor-pointer" onClick={() => openList('followers')}>
+                  <p className="font-bold text-orange-700">{stats.followersCount}</p>
+                  <p className="text-sm text-muted-foreground">Seguidores</p>
+                </div>
+                <div className="text-center cursor-pointer" onClick={() => openList('following')}>
+                  <p className="font-bold text-orange-700">{stats.followingCount}</p>
+                  <p className="text-sm text-muted-foreground">Siguiendo</p>
                 </div>
               </div>
+
+              {/* Botón de editar o seguir */}
+              <div className="flex gap-2">
+                {isOwnProfile ? (
+                  <Button onClick={() => setIsEditing(!isEditing)} className="bg-gradient-to-r from-orange-500 to-amber-500">
+                    <Edit2 className="h-4 w-4 ml-2" />
+                    {isEditing ? 'Cancelar' : 'Editar Perfil'}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={handleFollow}
+                      className={isFollowing ? "bg-gray-500 hover:bg-gray-600" : "bg-gradient-to-r from-orange-500 to-amber-500"}
+                    >
+                      {isFollowing ? <><UserMinus className="h-4 w-4 mr-2" />Dejar de seguir</> : <><UserPlus className="h-4 w-4 mr-2" />Seguir</>}
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowReportDialog(true)} className="border-red-300 text-red-700">
+                      <Flag className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
 
           {/* Editar perfil */}
           {isEditing && (
@@ -359,7 +391,7 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
                 <Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})}/>
               </div>
 
-              {/* Foto perfil */}
+              {/* Foto Perfil */}
               <div className="space-y-2">
                 <Label>Foto de Perfil</Label>
                 <input type="file" accept="image/*" className="hidden" id="profile-pic-upload" onChange={handleUploadProfilePicture} disabled={isUploadingProfilePic} />
@@ -445,6 +477,37 @@ export function ProfileView({ userId, isOwnProfile, onCommentClick }) {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleReportUser} className="bg-red-600 hover:bg-red-700">Enviar Reporte</AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Lista Seguidores / Siguiendo */}
+      <AlertDialog open={isListOpen} onOpenChange={setIsListOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{listType === 'followers' ? 'Seguidores' : 'Siguiendo'}</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-2 max-h-96 overflow-y-auto mt-2">
+            {listUsers.length === 0 ? (
+              <p className="text-muted-foreground text-center">No hay usuarios</p>
+            ) : listUsers.map(user => (
+              <div key={user.id} className="flex items-center gap-3 p-2 hover:bg-orange-50 rounded cursor-pointer">
+                <Avatar className="h-8 w-8 border-2 border-orange-300">
+                  {user.profilePicture ? (
+                    <AvatarImage src={user.profilePicture} />
+                  ) : (
+                    <AvatarFallback className="bg-orange-300 text-white">{user.name ? user.name.charAt(0) : 'U'}</AvatarFallback>
+                  )}
+                </Avatar>
+                <div>
+                  <p className="font-medium text-orange-700">{user.name}</p>
+                  {user.petName && <p className="text-sm text-muted-foreground">con {user.petName}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button variant="outline" onClick={() => setIsListOpen(false)}>Cerrar</Button>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </div>

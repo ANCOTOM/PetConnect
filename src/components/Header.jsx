@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Bell, Home, User, LogOut, Search, PawPrint, Users, Sparkles, Settings, Shield } from 'lucide-react';
+import { Bell, Home, Sparkles, Settings, Shield, LogOut, PawPrint, Search } from 'lucide-react';
 import { Badge } from './ui/badge';
 
 export function Header({ 
@@ -70,6 +70,7 @@ export function Header({
           {/* Navigation */}
           <nav className="flex items-center gap-2">
 
+            {/* Home */}
             <Button
               variant={isActive('/') ? 'secondary' : 'ghost'}
               size="icon"
@@ -79,16 +80,7 @@ export function Header({
               <Home className="h-5 w-5" />
             </Button>
 
-            <Button
-              variant={isActive('/following') ? 'secondary' : 'ghost'}
-              size="icon"
-              onClick={() => navigate('/following')}
-              className={isActive('/following') ? '' : 'text-white hover:bg-white/20'}
-              title="Siguiendo"
-            >
-              <Users className="h-5 w-5" />
-            </Button>
-
+            {/* Discover */}
             <Button
               variant={isActive('/discover') ? 'secondary' : 'ghost'}
               size="icon"
@@ -99,6 +91,7 @@ export function Header({
               <Sparkles className="h-5 w-5" />
             </Button>
 
+            {/* Notifications */}
             <div className="relative">
               <Button
                 variant={isActive('/notifications') ? 'secondary' : 'ghost'}
@@ -118,15 +111,7 @@ export function Header({
               )}
             </div>
 
-            <Button
-              variant={isActive(/^\/profile/) ? 'secondary' : 'ghost'}
-              size="icon"
-              onClick={() => navigate(`/profile/`)}
-              className={isActive(/^\/profile/) ? '' : 'text-white hover:bg-white/20'}
-            >
-              <User className="h-5 w-5" />
-            </Button>
-
+            {/* Settings */}
             <Button
               variant={isActive('/settings') ? 'secondary' : 'ghost'}
               size="icon"
@@ -137,6 +122,7 @@ export function Header({
               <Settings className="h-5 w-5" />
             </Button>
 
+            {/* Admin */}
             {isAdmin && (
               <Button
                 variant={isActive('/admin') ? 'secondary' : 'ghost'}
@@ -149,6 +135,7 @@ export function Header({
               </Button>
             )}
 
+            {/* Logout */}
             <Button
               variant="ghost"
               size="icon"
@@ -158,16 +145,18 @@ export function Header({
               <LogOut className="h-5 w-5" />
             </Button>
 
+            {/* Avatar que abre tu perfil */}
             <Avatar 
               className="h-9 w-9 border-2 border-white cursor-pointer" 
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate(`/profile/`)}
             >
-              {userProfilePicture && (
+              {userProfilePicture ? (
                 <AvatarImage src={userProfilePicture} alt={userName} />
+              ) : (
+                <AvatarFallback className="bg-white text-orange-600">
+                  {userName.charAt(0)}
+                </AvatarFallback>
               )}
-              <AvatarFallback className="bg-white text-orange-600">
-                {userName.charAt(0)}
-              </AvatarFallback>
             </Avatar>
 
           </nav>

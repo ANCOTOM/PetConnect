@@ -52,41 +52,38 @@ export default function App() {
 
   const navigate = useNavigate();
 
-  //Maneja la autenticación del usuario y verifica si la cuenta está suspendida
-  //Inicia cuando la app empieza o se monta el componente
+ 
   useEffect(() => {
-    //Esta funcion escucha los cambios en el estado de auth del usuario
-    //Si el usuario inicia sesión o cierra sesión, se ejecuta esta función
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) { //Si hay un usuario logueado
+      if (currentUser) {
         try {
           // Verificar suspensión antes de dar acceso
-        const userDocRef = doc(db, 'users', currentUser.uid); //Construye userDocRef: Que se fija en el documento de Firebase(db) en users y busca el uid del usuario actual 
-        const userDocSnap = await getDoc(userDocRef);//hace el getDoc para obtener el snapshot del documento
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
 
-          if (userDocSnap.exists() && userDocSnap.data().suspended) {//condiciones pa checkear si está suspendido
-            await signOut(auth);//fuerza logout
-            setUser(null);//limpia el estado del usuario
-            setProfile(null);//limpia el estado del perfil
-            toast.error('CUENTA SUSPENDIDA: Tu cuenta ha sido suspendida por violar las normas.', {//Mensajito de tipo toast
+          if (userDocSnap.exists() && userDocSnap.data().suspended) {
+            await signOut(auth);
+            setUser(null);
+            setProfile(null);
+            toast.error('CUENTA SUSPENDIDA: Tu cuenta ha sido suspendida por violar las normas.', {
               duration: 10000,
               action: {
                 label: 'Entendido',
                 onClick: () => console.log('Undo')
               },
             });
-          } else {//Si no esta suspendido
-            setUser(currentUser);//setea el estado del usuario
-            if (userDocSnap.exists()) {//si el snapshot del doc existe
-              setProfile({ id: userDocSnap.id, ...userDocSnap.data() });//setea el perfil con la info del doc
+          } else {
+            setUser(currentUser);
+            if (userDocSnap.exists()) {
+              setProfile({ id: userDocSnap.id, ...userDocSnap.data() });
             }
           }
-        } catch (error) {//Checkeos de errores
+        } catch (error) {
           console.error('Error checking suspension:', error);
           setUser(currentUser);
           await loadProfile(currentUser.uid);
         }
-      } else {//Pues si no funciona del todo, limpia y queda en nulo
+      } else {
         setUser(null);
         setProfile(null);
       }
@@ -96,17 +93,17 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  //Si hay usuario, carga el feed
+ 
   useEffect(() => {
     if (user) {
       loadFeed();
     }
   }, [user]);
-  //Funcion que carga el perfil del usuario, recibe como parametro el userId
+
   const loadProfile = async (userId) => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', userId));//agarra el doc del usuario
-      if (userDoc.exists()) {//si existe, setea el perfil con la info del doc
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
         setProfile({ id: userDoc.id, ...userDoc.data() });
       }
     } catch (error) {
@@ -114,128 +111,109 @@ export default function App() {
     }
   };
 
-  const loadFeed = async () => {//Funcion para cargar el feed
-    if (!user) return;//Si no hay usuario, no hace nada
+  const loadFeed = async () => {
+    if (!user) return;
 
     try {
-      // 1. Obtener lista de seguidos para filtrar privacidad
-      const followsQuery = query(//Comprueba a ver a quién sigue el usuario actual con respecto a la BD
-        collection(db, 'follows'),
-        where('followerId', '==', user.uid)
-      );
-      const followsSnapshot = await getDocs(followsQuery);//Igual que anteriormente con el usuario, obtiene el snapshot
-      const followingIds = followsSnapshot.docs.map(doc => doc.data().followingId);//Crea un array con los IDs de los usuarios que el usuario actual sigue
-
-      // 2. Cargar posts ordenados por fecha
     
-      const postsQuery = query(//Query simple para obtener los posts
+      const postsQuery = query(
         collection(db, 'posts'),
         orderBy('createdAt', 'desc'),
         limit(50)
       );
 
-      const snapshot = await getDocs(postsQuery);//Obtiene el snapshot de los posts
-      const postsData = [];//Array vacio para guardar los posts que se van a mostrar
+      const snapshot = await getDocs(postsQuery);
+      const postsData = [];
 
-      for (const docSnap of snapshot.docs) {//Recorre cada post
-        const postData = { id: docSnap.id, ...docSnap.data() };//Crea un objeto (postData) con la info del post
-
-        // FILTRO DE PRIVACIDAD
-        // Si es público: mostrar
-        // Si es amigos: mostrar solo si soy el autor O sigo al autor
-        const isMyPost = postData.userId === user.uid;
-        const isFollowingAuthor = followingIds.includes(postData.userId);
-        
-        if (postData.visibility === 'friends' && !isMyPost && !isFollowingAuthor) {//Si la visibilidad es "amigos" y no soy el autor ni sigo al autor
-          continue; // No mostrar este post
-        }
+      for (const docSnap of snapshot.docs) {
+        const postData = { id: docSnap.id, ...docSnap.data() };
 
        
-        if (postData.userId) {//Si el post tiene userId
-          const authorDoc = await getDoc(doc(db, 'users', postData.userId));//Obtiene el doc del autor
-          postData.author = authorDoc.exists() ? authorDoc.data() : null;//Si existe, añade la info del autor al postData
+        if (postData.userId) {
+          const authorDoc = await getDoc(doc(db, 'users', postData.userId));
+          postData.author = authorDoc.exists() ? authorDoc.data() : null;
         }
 
       
-        const likesQuery = query(//Chequea si el usuario le dio like al post con la BD
+        const likesQuery = query(
           collection(db, 'posts', docSnap.id, 'likes'),
           where('userId', '==', user.uid)
         );
-        const likesSnapshot = await getDocs(likesQuery);//Obtiene el snapshot de los likes
-        postData.isLiked = !likesSnapshot.empty;//Si el snapshot no está vacío, significa que el usuario le dio like
+        const likesSnapshot = await getDocs(likesQuery);
+        postData.isLiked = !likesSnapshot.empty;
 
      
-        const sharesQuery = query(//Chequea si el usuario compartió el post con la BD
+        const sharesQuery = query(
           collection(db, 'posts', docSnap.id, 'shares'),
           where('userId', '==', user.uid)
         );
-        const sharesSnapshot = await getDocs(sharesQuery);//Obtiene el snapshot de los shares
-        postData.isShared = !sharesSnapshot.empty;//Si el snapshot no está vacío, significa que el usuario compartió el post
+        const sharesSnapshot = await getDocs(sharesQuery);
+        postData.isShared = !sharesSnapshot.empty;
 
-        postsData.push(postData);//Finalmente, añade el postData al array de postsData
+        postsData.push(postData);
       }
 
-      setPosts(postsData);//Setea el estado de posts con los postsData filtrados y procesados en temas de los likes y shares o compartidos
+      setPosts(postsData);
     } catch (error) {
-      console.error('Error Cargando el feed:', error);
+      console.error('Error loading feed:', error);
     }
   };
 
-  const handleSearch = async (searchQuery, type) => {//funcion para hacer busquedas, de tipo usuarios o posts
-    if (!user) return;//Si no hay usuario, no hace nada
+  const handleSearch = async (searchQuery, type) => {
+    if (!user) return;
 
     try {
-      if (type === 'users') {//Si es usuario lo que va a buscar
+      if (type === 'users') {
        
-        const usersSnapshot = await getDocs(collection(db, 'users'));//Obtiene el snapshot de los usuarios
-        const results = usersSnapshot.docs//Se hace la variable que es igual al snapshot de los usuarios
-          .map(doc => ({ id: doc.id, ...doc.data() }))//Mapea cada doc a un objeto con la info del usuario
-          .filter(u => //Filtra los usuarios cuyo nombre o email coincida con la búsqueda
-            u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||//Si el nombre del usuario incluye la búsqueda
-            u.email?.toLowerCase().includes(searchQuery.toLowerCase())//Si el email del usuario incluye la búsqueda
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const results = usersSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(u => 
+            u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            u.email?.toLowerCase().includes(searchQuery.toLowerCase())
           );
 
-        setSearchResults(results);//Setea el estado de searchResults con los resultados
-        setSearchType('users');//Setea el tipo de búsqueda como 'users'
-        navigate('/search');//Navega a la página de búsqueda
-      } else {//Si no son usuarios, son posts lo que se va a buscar
+        setSearchResults(results);
+        setSearchType('users');
+        navigate('/search');
+      } else {
         
-        const postsSnapshot = await getDocs(collection(db, 'posts'));//Obtiene el snapshot de los posts
-        const results = [];//Array vacío para guardar los resultados
+        const postsSnapshot = await getDocs(collection(db, 'posts'));
+        const results = [];
 
-        for (const docSnap of postsSnapshot.docs) {//Ciclo para recorrer cada post
-          const postData = { id: docSnap.id, ...docSnap.data() };//Crea un objeto (postData) con la info del post
+        for (const docSnap of postsSnapshot.docs) {
+          const postData = { id: docSnap.id, ...docSnap.data() };
           
-          if (postData.content?.toLowerCase().includes(searchQuery.toLowerCase())) {//Si el contenido del post incluye la búsqueda
+          if (postData.content?.toLowerCase().includes(searchQuery.toLowerCase())) {
          
-            if (postData.userId) {//Si el post tiene userId
-              const authorDoc = await getDoc(doc(db, 'users', postData.userId));//Obtiene el doc del autor
-              postData.author = authorDoc.exists() ? authorDoc.data() : null;//Si existe, añade la info del autor al postData
+            if (postData.userId) {
+              const authorDoc = await getDoc(doc(db, 'users', postData.userId));
+              postData.author = authorDoc.exists() ? authorDoc.data() : null;
             }
-            results.push(postData);//Añade el postData a los resultados
+            results.push(postData);
           }
         }
 
-        setPosts(results);//Setea el estado de posts con los resultados, o sea lo que se pushea en el array 
-        setSearchType('posts');//Setea el tipo de búsqueda como 'posts'
-        navigate('/search');//Navega a la página de búsqueda
+        setPosts(results);
+        setSearchType('posts');
+        navigate('/search');
       }
     } catch (error) {
       console.error('Error searching:', error);
     }
   };
 
-  const loadFollowing = async () => {//Función para cargar los usuarios que el usuario actual sigue
+  const loadFollowing = async () => {
     if (!user) return;
 
     try {
-      const followsQuery = query(//query para obtener los follows
+      const followsQuery = query(
         collection(db, 'follows'),
-        where('followerId', '==', user.uid)//filtro para que solo traiga los follows del usuario actual
+        where('followerId', '==', user.uid)
       );
 
-      const snapshot = await getDocs(followsQuery);//Obtiene el snapshot de los follows
-      const followingData = [];//Array vacío para guardar los datos de los usuarios que sigue
+      const snapshot = await getDocs(followsQuery);
+      const followingData = [];
 
       for (const docSnap of snapshot.docs) {
         const followData = docSnap.data();
@@ -252,19 +230,19 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {//Función para cerrar sesión
+  const handleLogout = async () => {
     try {
-      await auth.signOut();//Cierra sesión con Firebase Auth
-      setUser(null);//Limpia el estado del usuario
-      setProfile(null);//Limpia el estado del perfil
-      setPosts([]);//Limpia el estado de los posts
-      navigate('/');//Navega a la página principal
+      await auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setPosts([]);
+      navigate('/');
     } catch (error) {
       console.error('Error logging out:', error);
     }
   };
 
-  const loadRecommendations = async () => {//Función para cargar recomendaciones de usuarios para seguir
+  const loadRecommendations = async () => {
     if (!user) return;
 
     try {
@@ -278,10 +256,10 @@ export default function App() {
       
       const followingIds = followsSnapshot.docs.map(doc => doc.data().followingId);
       
-      const recommendations = usersSnapshot.docs //Array de usuarios recomendados
-        .map(doc => ({ id: doc.id, ...doc.data() }))//Mapea cada doc a un objeto con la info del usuario
-        .filter(u => u.id !== user.uid && !followingIds.includes(u.id))//Filtra para excluir al usuario actual y a los que ya sigue
-        .slice(0, 10); //Limita a 10 recomendaciones
+      const recommendations = usersSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(u => u.id !== user.uid && !followingIds.includes(u.id))
+        .slice(0, 10); 
 
       setRecommendedUsers(recommendations);
     } catch (error) {
@@ -344,7 +322,7 @@ export default function App() {
     }
   };
 
-  const handleViewChange = (view) => {//Función para manejar el cambio de vista en la navegación
+  const handleViewChange = (view) => {
     switch (view) {
       case 'feed':
         navigate('/');
@@ -639,11 +617,6 @@ if (isLoading) {
                 }
               }}
             />
-          } />
-
-      
-          <Route path="/following" element={
-            <FollowingRoute />
           } />
 
         
